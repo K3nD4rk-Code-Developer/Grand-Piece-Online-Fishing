@@ -25,1137 +25,1140 @@ except:
     except:
         pass
 
-app = Flask(__name__)
-CORS(app)
+FlaskApplication = Flask(__name__)
+CORS(FlaskApplication)
 
-class AreaSelector:
-    def __init__(self, parent, initialBox, callback):
-        self.Callback = callback
-        self.Parent = parent
-        self.Closed = False
+class RegionSelectionWindow:
+    def __init__(self, ParentWindow, InitialBoundingBox, CompletionCallback):
+        self.CompletionCallback = CompletionCallback
+        self.ParentWindow = ParentWindow
+        self.IsWindowClosed = False
         
-        self.Window = tk.Tk()
-        self.Window.attributes('-alpha', 0.6)
-        self.Window.attributes('-topmost', True)
-        self.Window.overrideredirect(True)
-        self.X1, self.Y1 = initialBox["x1"], initialBox["y1"]
-        self.X2, self.Y2 = initialBox["x2"], initialBox["y2"]
-        width = self.X2 - self.X1
-        height = self.Y2 - self.Y1
-        self.Window.geometry(f"{width}x{height}+{self.X1}+{self.Y1}")
-        self.Window.configure(bg='blue')
-        self.Canvas = tk.Canvas(self.Window, bg='blue', highlightthickness=3, highlightbackground='black')
-        self.Canvas.pack(fill='both', expand=True)
-        self.Dragging = False
-        self.Resizing = False
-        self.ResizeEdge = None
-        self.StartX = 0
-        self.StartY = 0
-        self.ResizeThreshold = 10
-        self.Canvas.bind('<Button-1>', self.OnMouseDown)
-        self.Canvas.bind('<B1-Motion>', self.OnMouseDrag)
-        self.Canvas.bind('<ButtonRelease-1>', self.OnMouseUp)
-        self.Canvas.bind('<Motion>', self.OnMouseMove)
+        self.RootWindow = tk.Tk()
+        self.RootWindow.attributes('-alpha', 0.6)
+        self.RootWindow.attributes('-topmost', True)
+        self.RootWindow.overrideredirect(True)
+        self.LeftBoundary, self.TopBoundary = InitialBoundingBox["x1"], InitialBoundingBox["y1"]
+        self.RightBoundary, self.BottomBoundary = InitialBoundingBox["x2"], InitialBoundingBox["y2"]
+        WindowWidth = self.RightBoundary - self.LeftBoundary
+        WindowHeight = self.BottomBoundary - self.TopBoundary
+        self.RootWindow.geometry(f"{WindowWidth}x{WindowHeight}+{self.LeftBoundary}+{self.TopBoundary}")
+        self.RootWindow.configure(bg='blue')
+        self.DrawingCanvas = tk.Canvas(self.RootWindow, bg='blue', highlightthickness=3, highlightbackground='black')
+        self.DrawingCanvas.pack(fill='both', expand=True)
+        self.IsDraggingWindow = False
+        self.IsResizingWindow = False
+        self.ActiveResizeEdge = None
+        self.MouseDownPositionX = 0
+        self.MouseDownPositionY = 0
+        self.EdgeDetectionThreshold = 10
+        self.DrawingCanvas.bind('<Button-1>', self.HandleMousePress)
+        self.DrawingCanvas.bind('<B1-Motion>', self.HandleMouseDragMotion)
+        self.DrawingCanvas.bind('<ButtonRelease-1>', self.HandleMouseRelease)
+        self.DrawingCanvas.bind('<Motion>', self.HandleMouseHover)
         
-        self.Window.bind('<Return>', lambda e: self.Close())
-        self.Window.bind('<Escape>', lambda e: self.Close())
+        self.RootWindow.bind('<Return>', lambda EventData: self.CloseWindow())
+        self.RootWindow.bind('<Escape>', lambda EventData: self.CloseWindow())
         
-        self.Window.protocol("WM_DELETE_WINDOW", self.Close)
+        self.RootWindow.protocol("WM_DELETE_WINDOW", self.CloseWindow)
         
-        self.Window.mainloop()
+        self.RootWindow.mainloop()
 
-    def OnMouseMove(self, event):
-        x, y = event.x, event.y
-        width = self.Window.winfo_width()
-        height = self.Window.winfo_height()
-        atLeft = x < self.ResizeThreshold
-        atRight = x > width - self.ResizeThreshold
-        atTop = y < self.ResizeThreshold
-        atBottom = y > height - self.ResizeThreshold
+    def HandleMouseHover(self, EventData):
+        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
+        CurrentWindowWidth = self.RootWindow.winfo_width()
+        CurrentWindowHeight = self.RootWindow.winfo_height()
+        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
+        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
+        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
+        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
 
-        if atLeft and atTop:
-            self.Canvas.config(cursor='top_left_corner')
-        elif atRight and atTop:
-            self.Canvas.config(cursor='top_right_corner')
-        elif atLeft and atBottom:
-            self.Canvas.config(cursor='bottom_left_corner')
-        elif atRight and atBottom:
-            self.Canvas.config(cursor='bottom_right_corner')
-        elif atLeft or atRight:
-            self.Canvas.config(cursor='sb_h_double_arrow')
-        elif atTop or atBottom:
-            self.Canvas.config(cursor='sb_v_double_arrow')
+        if IsNearLeftEdge and IsNearTopEdge:
+            self.DrawingCanvas.config(cursor='top_left_corner')
+        elif IsNearRightEdge and IsNearTopEdge:
+            self.DrawingCanvas.config(cursor='top_right_corner')
+        elif IsNearLeftEdge and IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='bottom_left_corner')
+        elif IsNearRightEdge and IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='bottom_right_corner')
+        elif IsNearLeftEdge or IsNearRightEdge:
+            self.DrawingCanvas.config(cursor='sb_h_double_arrow')
+        elif IsNearTopEdge or IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='sb_v_double_arrow')
         else:
-            self.Canvas.config(cursor='fleur')
+            self.DrawingCanvas.config(cursor='fleur')
 
-    def OnMouseDown(self, event):
-        self.StartX = event.x
-        self.StartY = event.y
-        x, y = event.x, event.y
-        width = self.Window.winfo_width()
-        height = self.Window.winfo_height()
-        atLeft = x < self.ResizeThreshold
-        atRight = x > width - self.ResizeThreshold
-        atTop = y < self.ResizeThreshold
-        atBottom = y > height - self.ResizeThreshold
+    def HandleMousePress(self, EventData):
+        self.MouseDownPositionX = EventData.x
+        self.MouseDownPositionY = EventData.y
+        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
+        CurrentWindowWidth = self.RootWindow.winfo_width()
+        CurrentWindowHeight = self.RootWindow.winfo_height()
+        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
+        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
+        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
+        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
 
-        if atLeft or atRight or atTop or atBottom:
-            self.Resizing = True
-            self.ResizeEdge = {'left': atLeft, 'right': atRight, 'top': atTop, 'bottom': atBottom}
+        if IsNearLeftEdge or IsNearRightEdge or IsNearTopEdge or IsNearBottomEdge:
+            self.IsResizingWindow = True
+            self.ActiveResizeEdge = {'left': IsNearLeftEdge, 'right': IsNearRightEdge, 'top': IsNearTopEdge, 'bottom': IsNearBottomEdge}
         else:
-            self.Dragging = True
+            self.IsDraggingWindow = True
 
-    def OnMouseDrag(self, event):
-        if self.Dragging:
-            dx = event.x - self.StartX
-            dy = event.y - self.StartY
-            newX = self.Window.winfo_x() + dx
-            newY = self.Window.winfo_y() + dy
-            self.Window.geometry(f"+{newX}+{newY}")
-        elif self.Resizing:
-            currentX = self.Window.winfo_x()
-            currentY = self.Window.winfo_y()
-            currentWidth = self.Window.winfo_width()
-            currentHeight = self.Window.winfo_height()
-            newX = currentX
-            newY = currentY
-            newWidth = currentWidth
-            newHeight = currentHeight
+    def HandleMouseDragMotion(self, EventData):
+        if self.IsDraggingWindow:
+            HorizontalDelta = EventData.x - self.MouseDownPositionX
+            VerticalDelta = EventData.y - self.MouseDownPositionY
+            UpdatedWindowX = self.RootWindow.winfo_x() + HorizontalDelta
+            UpdatedWindowY = self.RootWindow.winfo_y() + VerticalDelta
+            self.RootWindow.geometry(f"+{UpdatedWindowX}+{UpdatedWindowY}")
+        elif self.IsResizingWindow:
+            CurrentWindowX = self.RootWindow.winfo_x()
+            CurrentWindowY = self.RootWindow.winfo_y()
+            CurrentWindowWidth = self.RootWindow.winfo_width()
+            CurrentWindowHeight = self.RootWindow.winfo_height()
+            UpdatedWindowX = CurrentWindowX
+            UpdatedWindowY = CurrentWindowY
+            UpdatedWindowWidth = CurrentWindowWidth
+            UpdatedWindowHeight = CurrentWindowHeight
 
-            if self.ResizeEdge['left']:
-                dx = event.x - self.StartX
-                newX = currentX + dx
-                newWidth = currentWidth - dx
-            elif self.ResizeEdge['right']:
-                newWidth = event.x
+            if self.ActiveResizeEdge['left']:
+                HorizontalDelta = EventData.x - self.MouseDownPositionX
+                UpdatedWindowX = CurrentWindowX + HorizontalDelta
+                UpdatedWindowWidth = CurrentWindowWidth - HorizontalDelta
+            elif self.ActiveResizeEdge['right']:
+                UpdatedWindowWidth = EventData.x
 
-            if self.ResizeEdge['top']:
-                dy = event.y - self.StartY
-                newY = currentY + dy
-                newHeight = currentHeight - dy
-            elif self.ResizeEdge['bottom']:
-                newHeight = event.y
+            if self.ActiveResizeEdge['top']:
+                VerticalDelta = EventData.y - self.MouseDownPositionY
+                UpdatedWindowY = CurrentWindowY + VerticalDelta
+                UpdatedWindowHeight = CurrentWindowHeight - VerticalDelta
+            elif self.ActiveResizeEdge['bottom']:
+                UpdatedWindowHeight = EventData.y
 
-            if newWidth < 50:
-                newWidth = 50
-                newX = currentX
-            if newHeight < 50:
-                newHeight = 50
-                newY = currentY
+            if UpdatedWindowWidth < 50:
+                UpdatedWindowWidth = 50
+                UpdatedWindowX = CurrentWindowX
+            if UpdatedWindowHeight < 50:
+                UpdatedWindowHeight = 50
+                UpdatedWindowY = CurrentWindowY
 
-            self.Window.geometry(f"{newWidth}x{newHeight}+{newX}+{newY}")
+            self.RootWindow.geometry(f"{UpdatedWindowWidth}x{UpdatedWindowHeight}+{UpdatedWindowX}+{UpdatedWindowY}")
 
-    def OnMouseUp(self, event):
-        self.Dragging = False
-        self.Resizing = False
-        self.ResizeEdge = None
+    def HandleMouseRelease(self, EventData):
+        self.IsDraggingWindow = False
+        self.IsResizingWindow = False
+        self.ActiveResizeEdge = None
 
-    def Close(self):
-        if self.Closed:
+    def CloseWindow(self):
+        if self.IsWindowClosed:
             return
-        self.Closed = True
+        self.IsWindowClosed = True
         
         try:
-            x1 = self.Window.winfo_x()
-            y1 = self.Window.winfo_y()
-            x2 = x1 + self.Window.winfo_width()
-            y2 = y1 + self.Window.winfo_height()
-            coords = {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
+            FinalLeftBoundary = self.RootWindow.winfo_x()
+            FinalTopBoundary = self.RootWindow.winfo_y()
+            FinalRightBoundary = FinalLeftBoundary + self.RootWindow.winfo_width()
+            FinalBottomBoundary = FinalTopBoundary + self.RootWindow.winfo_height()
+            FinalCoordinates = {"x1": FinalLeftBoundary, "y1": FinalTopBoundary, "x2": FinalRightBoundary, "y2": FinalBottomBoundary}
             
-            self.Window.quit()
-            self.Window.destroy()
+            self.RootWindow.quit()
+            self.RootWindow.destroy()
             
-            if self.Callback:
-                self.Callback(coords)
-        except Exception as e:
-            print(f"Error closing area selector: {e}")
+            if self.CompletionCallback:
+                self.CompletionCallback(FinalCoordinates)
+        except Exception as ErrorDetails:
+            print(f"Error closing area selector: {ErrorDetails}")
 
-class FishingMacroBackend:
+class AutomatedFishingSystem:
     def __init__(self):
-        user32 = ctypes.windll.user32
-        screenWidth = user32.GetSystemMetrics(0)
-        screenHeight = user32.GetSystemMetrics(1)
+        SystemDisplayMetrics = ctypes.windll.user32
+        MonitorWidth = SystemDisplayMetrics.GetSystemMetrics(0)
+        MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
 
-        self.configFile = "Auto Fish Settings.json"
-        self.hotkeys = {"start_stop": "f1", "change_area": "f2", "exit": "f3"}
+        self.ConfigurationFilePath = "Auto Fish Settings.json"
+        self.GlobalHotkeyBindings = {"start_stop": "f1", "change_area": "f2", "exit": "f3"}
 
-        self.alwaysOnTop = True
-        self.showDebugOverlay = False
+        self.WindowAlwaysOnTopEnabled = True
+        self.DebugOverlayVisible = False
 
-        self.areaBox = {
-            "x1": int(screenWidth * 0.52461),
-            "y1": int(screenHeight * 0.29167),
-            "x2": int(screenWidth * 0.68477),
-            "y2": int(screenHeight * 0.79097)
+        self.ScanningRegionBounds = {
+            "x1": int(MonitorWidth * 0.52461),
+            "y1": int(MonitorHeight * 0.29167),
+            "x2": int(MonitorWidth * 0.68477),
+            "y2": int(MonitorHeight * 0.79097)
         }
 
-        self.waterPoint = None
+        self.WaterCastingTargetLocation = None
 
-        self.kp = 1.4
-        self.kd = 0.6
-        self.pdClamp = 1.0
-        self.castHoldDuration = 0.1
-        self.recastTimeout = 25.0
-        self.fishEndDelay = 0.5
-        self.rodHotkey = "4"
-        self.anythingElseHotkey = "1"
-        self.autoBuyCommonBait = True
-        self.autoStoreDevilFruit = False
-        self.autoSelectTopBait = False
+        self.ProportionalGainCoefficient = 1.4
+        self.DerivativeGainCoefficient = 0.6
+        self.ControlSignalMaximumClamp = 1.0
+        self.MouseHoldDurationForCast = 0.1
+        self.MaximumWaitTimeBeforeRecast = 25.0
+        self.DelayAfterFishCaptured = 0.5
+        self.FishingRodInventorySlot = "4"
+        self.AlternateInventorySlot = "1"
+        self.AutomaticBaitPurchaseEnabled = True
+        self.AutomaticFruitStorageEnabled = False
+        self.AutomaticTopBaitSelectionEnabled = False
 
-        self.areaSelectorActive = False
-        self.areaSelector = None
+        self.RegionSelectorCurrentlyActive = False
+        self.ActiveRegionSelectorInstance = None
 
-        self.leftPoint = None
-        self.middlePoint = None
-        self.rightPoint = None
-        self.storeFruitPoint = None
-        self.baitPoint = None
+        self.ShopLeftButtonLocation = None
+        self.ShopCenterButtonLocation = None
+        self.ShopRightButtonLocation = None
+        self.FruitStorageButtonLocation = None
+        self.BaitSelectionButtonLocation = None
 
-        self.loopsPerPurchase = 100
-        self.devilFruitHotkey = "6"
+        self.BaitPurchaseFrequencyCounter = 100
+        self.DevilFruitInventorySlot = "6"
 
-        self.robloxFocusDelay = 0.2
-        self.robloxPostFocusDelay = 0.2
-        self.preCastEDelay = 1.25
-        self.preCastClickDelay = 0.5
-        self.preCastTypeDelay = 0.25
-        self.preCastAntiDetectDelay = 0.05
-        self.storeFruitHotkeyDelay = 1.0
-        self.storeFruitClickDelay = 2.0
-        self.storeFruitShiftDelay = 0.5
-        self.storeFruitBackspaceDelay = 1.5
-        self.autoSelectBaitDelay = 0.5
-        self.blackScreenThreshold = 0.5
-        self.antiMacroSpamDelay = 0.25
-        self.rodSelectDelay = 0.2
-        self.cursorAntiDetectDelay = 0.05
-        self.scanLoopDelay = 0.1
-        self.pdApproachingDamping = 2.0
-        self.pdChasingDamping = 0.5
-        self.gapToleranceMultiplier = 2.0
-        self.stateResendInterval = 0.5
+        self.RobloxWindowFocusInitialDelay = 0.2
+        self.RobloxWindowFocusFollowupDelay = 0.2
+        self.PreCastDialogOpenDelay = 1.25
+        self.PreCastMouseClickDelay = 0.5
+        self.PreCastKeyboardInputDelay = 0.25
+        self.PreCastAntiDetectionDelay = 0.05
+        self.FruitStorageHotkeyActivationDelay = 1.0
+        self.FruitStorageClickConfirmationDelay = 2.0
+        self.FruitStorageShiftKeyPressDelay = 0.5
+        self.FruitStorageBackspaceDeletionDelay = 1.5
+        self.BaitSelectionConfirmationDelay = 0.5
+        self.BlackScreenDetectionRatioThreshold = 0.5
+        self.AntiMacroDialogSpamDelay = 0.25
+        self.InventorySlotSwitchingDelay = 0.2
+        self.MouseMovementAntiDetectionDelay = 0.05
+        self.ImageProcessingLoopDelay = 0.1
+        self.PDControllerApproachingStateDamping = 2.0
+        self.PDControllerChasingStateDamping = 0.5
+        self.BarGroupingGapToleranceMultiplier = 2.0
+        self.InputStateResendFrequency = 0.5
 
-        self.isRunning = False
-        self.isRebinding = None
-        self.isHoldingClick = False
-        self.lastError = None
-        self.lastDarkGrayY = None
-        self.lastScanTime = time.time()
-        self.lastStateChangeTime = time.time()
-        self.lastInputResendTime = time.time()
-        self.hasFocusedRoblox = False
-        self.baitPurchaseLoopCounter = 0
+        self.MacroCurrentlyExecuting = False
+        self.CurrentlyRebindingHotkey = None
+        self.MouseButtonCurrentlyPressed = False
+        self.PreviousControlLoopErrorValue = None
+        self.PreviousTargetBarVerticalPosition = None
+        self.LastImageScanTimestamp = time.time()
+        self.LastControlStateChangeTimestamp = time.time()
+        self.LastInputResendTimestamp = time.time()
+        self.RobloxWindowAlreadyFocused = False
+        self.BaitPurchaseIterationCounter = 0
 
-        self.fishCaught = 0
-        self.totalElapsedTime = 0
-        self.currentSessionStartTime = None
-        self.lastFishTime = None
+        self.TotalFishSuccessfullyCaught = 0
+        self.CumulativeRunningTimeSeconds = 0
+        self.CurrentSessionBeginTimestamp = None
+        self.MostRecentFishCaptureTimestamp = None
 
-        self.mouseListener = None
-        self.currentPointSetting = None
+        self.MouseEventListenerInstance = None
+        self.CurrentlySettingPointName = None
 
-        self.loadSettings()
-        self.setupHotkeys()
+        self.LoadConfigurationFromDisk()
+        self.RegisterAllHotkeyBindings()
     
-    def loadSettings(self):
-        if os.path.exists(self.configFile):
+    def LoadConfigurationFromDisk(self):
+        if os.path.exists(self.ConfigurationFilePath):
             try:
-                with open(self.configFile, 'r') as f:
-                    data = json.load(f)
+                with open(self.ConfigurationFilePath, 'r') as ConfigurationFileHandle:
+                    ParsedConfigurationData = json.load(ConfigurationFileHandle)
 
-                    self.hotkeys.update(data.get("hotkeys", {}))
-                    self.areaBox.update(data.get("area_box", {}))
+                    self.GlobalHotkeyBindings.update(ParsedConfigurationData.get("hotkeys", {}))
+                    self.ScanningRegionBounds.update(ParsedConfigurationData.get("area_box", {}))
 
-                    self.alwaysOnTop = data.get("always_on_top", True)
-                    self.showDebugOverlay = data.get("show_debug_overlay", False)
+                    self.WindowAlwaysOnTopEnabled = ParsedConfigurationData.get("always_on_top", True)
+                    self.DebugOverlayVisible = ParsedConfigurationData.get("show_debug_overlay", False)
 
-                    self.waterPoint = data.get("water_point", None)
+                    self.WaterCastingTargetLocation = ParsedConfigurationData.get("water_point", None)
 
-                    self.kp = data.get("kp", 1.4)
-                    self.kd = data.get("kd", 0.6)
-                    self.pdClamp = data.get("pd_clamp", 1.0)
+                    self.ProportionalGainCoefficient = ParsedConfigurationData.get("kp", 1.4)
+                    self.DerivativeGainCoefficient = ParsedConfigurationData.get("kd", 0.6)
+                    self.ControlSignalMaximumClamp = ParsedConfigurationData.get("pd_clamp", 1.0)
 
-                    self.castHoldDuration = data.get("cast_hold_duration", 0.1)
-                    self.recastTimeout = data.get("recast_timeout", 25.0)
-                    self.fishEndDelay = data.get("fish_end_delay", 0.5)
+                    self.MouseHoldDurationForCast = ParsedConfigurationData.get("cast_hold_duration", 0.1)
+                    self.MaximumWaitTimeBeforeRecast = ParsedConfigurationData.get("recast_timeout", 25.0)
+                    self.DelayAfterFishCaptured = ParsedConfigurationData.get("fish_end_delay", 0.5)
 
-                    self.rodHotkey = data.get("rod_hotkey", "4")
-                    self.anythingElseHotkey = data.get("anything_else_hotkey", "1")
-                    self.devilFruitHotkey = data.get("devil_fruit_hotkey", "6")
+                    self.FishingRodInventorySlot = ParsedConfigurationData.get("rod_hotkey", "4")
+                    self.AlternateInventorySlot = ParsedConfigurationData.get("anything_else_hotkey", "1")
+                    self.DevilFruitInventorySlot = ParsedConfigurationData.get("devil_fruit_hotkey", "6")
 
-                    self.autoBuyCommonBait = data.get("auto_buy_common_bait", True)
-                    self.autoStoreDevilFruit = data.get("auto_store_devil_fruit", False)
-                    self.autoSelectTopBait = data.get("auto_select_top_bait", False)
+                    self.AutomaticBaitPurchaseEnabled = ParsedConfigurationData.get("auto_buy_common_bait", True)
+                    self.AutomaticFruitStorageEnabled = ParsedConfigurationData.get("auto_store_devil_fruit", False)
+                    self.AutomaticTopBaitSelectionEnabled = ParsedConfigurationData.get("auto_select_top_bait", False)
 
-                    self.leftPoint = data.get("left_point", None)
-                    self.middlePoint = data.get("middle_point", None)
-                    self.rightPoint = data.get("right_point", None)
-                    self.storeFruitPoint = data.get("store_fruit_point", None)
-                    self.baitPoint = data.get("bait_point", None)
+                    self.ShopLeftButtonLocation = ParsedConfigurationData.get("left_point", None)
+                    self.ShopCenterButtonLocation = ParsedConfigurationData.get("middle_point", None)
+                    self.ShopRightButtonLocation = ParsedConfigurationData.get("right_point", None)
+                    self.FruitStorageButtonLocation = ParsedConfigurationData.get("store_fruit_point", None)
+                    self.BaitSelectionButtonLocation = ParsedConfigurationData.get("bait_point", None)
 
-                    self.loopsPerPurchase = data.get("loops_per_purchase", 100)
+                    self.BaitPurchaseFrequencyCounter = ParsedConfigurationData.get("loops_per_purchase", 100)
 
-                    self.robloxFocusDelay = data.get("roblox_focus_delay", 0.2)
-                    self.robloxPostFocusDelay = data.get("roblox_post_focus_delay", 0.2)
-                    self.preCastEDelay = data.get("pre_cast_e_delay", 1.25)
-                    self.preCastClickDelay = data.get("pre_cast_click_delay", 0.5)
-                    self.preCastTypeDelay = data.get("pre_cast_type_delay", 0.25)
-                    self.preCastAntiDetectDelay = data.get("pre_cast_anti_detect_delay", 0.05)
+                    self.RobloxWindowFocusInitialDelay = ParsedConfigurationData.get("roblox_focus_delay", 0.2)
+                    self.RobloxWindowFocusFollowupDelay = ParsedConfigurationData.get("roblox_post_focus_delay", 0.2)
+                    self.PreCastDialogOpenDelay = ParsedConfigurationData.get("pre_cast_e_delay", 1.25)
+                    self.PreCastMouseClickDelay = ParsedConfigurationData.get("pre_cast_click_delay", 0.5)
+                    self.PreCastKeyboardInputDelay = ParsedConfigurationData.get("pre_cast_type_delay", 0.25)
+                    self.PreCastAntiDetectionDelay = ParsedConfigurationData.get("pre_cast_anti_detect_delay", 0.05)
 
-                    self.storeFruitHotkeyDelay = data.get("store_fruit_hotkey_delay", 1.0)
-                    self.storeFruitClickDelay = data.get("store_fruit_click_delay", 2.0)
-                    self.storeFruitShiftDelay = data.get("store_fruit_shift_delay", 0.5)
-                    self.storeFruitBackspaceDelay = data.get("store_fruit_backspace_delay", 1.5)
+                    self.FruitStorageHotkeyActivationDelay = ParsedConfigurationData.get("store_fruit_hotkey_delay", 1.0)
+                    self.FruitStorageClickConfirmationDelay = ParsedConfigurationData.get("store_fruit_click_delay", 2.0)
+                    self.FruitStorageShiftKeyPressDelay = ParsedConfigurationData.get("store_fruit_shift_delay", 0.5)
+                    self.FruitStorageBackspaceDeletionDelay = ParsedConfigurationData.get("store_fruit_backspace_delay", 1.5)
 
-                    self.autoSelectBaitDelay = data.get("auto_select_bait_delay", 0.5)
-                    self.blackScreenThreshold = data.get("black_screen_threshold", 0.5)
-                    self.antiMacroSpamDelay = data.get("anti_macro_spam_delay", 0.25)
-                    self.rodSelectDelay = data.get("rod_select_delay", 0.2)
-                    self.cursorAntiDetectDelay = data.get("cursor_anti_detect_delay", 0.05)
-                    self.scanLoopDelay = data.get("scan_loop_delay", 0.1)
+                    self.BaitSelectionConfirmationDelay = ParsedConfigurationData.get("auto_select_bait_delay", 0.5)
+                    self.BlackScreenDetectionRatioThreshold = ParsedConfigurationData.get("black_screen_threshold", 0.5)
+                    self.AntiMacroDialogSpamDelay = ParsedConfigurationData.get("anti_macro_spam_delay", 0.25)
+                    self.InventorySlotSwitchingDelay = ParsedConfigurationData.get("rod_select_delay", 0.2)
+                    self.MouseMovementAntiDetectionDelay = ParsedConfigurationData.get("cursor_anti_detect_delay", 0.05)
+                    self.ImageProcessingLoopDelay = ParsedConfigurationData.get("scan_loop_delay", 0.1)
 
-                    self.pdApproachingDamping = data.get("pd_approaching_damping", 2.0)
-                    self.pdChasingDamping = data.get("pd_chasing_damping", 0.5)
-                    self.gapToleranceMultiplier = data.get("gap_tolerance_multiplier", 2.0)
-                    self.stateResendInterval = data.get("state_resend_interval", 0.5)
-            except Exception as e:
+                    self.PDControllerApproachingStateDamping = ParsedConfigurationData.get("pd_approaching_damping", 2.0)
+                    self.PDControllerChasingStateDamping = ParsedConfigurationData.get("pd_chasing_damping", 0.5)
+                    self.BarGroupingGapToleranceMultiplier = ParsedConfigurationData.get("gap_tolerance_multiplier", 2.0)
+                    self.InputStateResendFrequency = ParsedConfigurationData.get("state_resend_interval", 0.5)
+            except Exception as LoadError:
                 import traceback
                 traceback.print_exc()
 
     
-    def saveSettings(self):
+    def SaveConfigurationToDisk(self):
         try:
-            with open(self.configFile, 'w') as f:
+            with open(self.ConfigurationFilePath, 'w') as ConfigurationFileHandle:
                 json.dump({
-                    "hotkeys": self.hotkeys,
-                    "area_box": self.areaBox,
-                    "always_on_top": self.alwaysOnTop,
-                    "show_debug_overlay": self.showDebugOverlay,
-                    "water_point": self.waterPoint,
-                    "kp": self.kp,
-                    "kd": self.kd,
-                    "pd_clamp": self.pdClamp,
-                    "cast_hold_duration": self.castHoldDuration,
-                    "recast_timeout": self.recastTimeout,
-                    "fish_end_delay": self.fishEndDelay,
-                    "rod_hotkey": self.rodHotkey,
-                    "anything_else_hotkey": self.anythingElseHotkey,
-                    "auto_buy_common_bait": self.autoBuyCommonBait,
-                    "auto_store_devil_fruit": self.autoStoreDevilFruit,
-                    "auto_select_top_bait": self.autoSelectTopBait,
-                    "left_point": self.leftPoint,
-                    "middle_point": self.middlePoint,
-                    "right_point": self.rightPoint,
-                    "loops_per_purchase": self.loopsPerPurchase,
-                    "store_fruit_point": self.storeFruitPoint,
-                    "devil_fruit_hotkey": self.devilFruitHotkey,
-                    "bait_point": self.baitPoint,
-                    "pd_approaching_damping": self.pdApproachingDamping,
-                    "pd_chasing_damping": self.pdChasingDamping,
-                    "gap_tolerance_multiplier": self.gapToleranceMultiplier,
-                    "state_resend_interval": self.stateResendInterval
-                }, f, indent=4)
-        except Exception as e:
-            print(f"Error saving settings: {e}")
+                    "hotkeys": self.GlobalHotkeyBindings,
+                    "area_box": self.ScanningRegionBounds,
+                    "always_on_top": self.WindowAlwaysOnTopEnabled,
+                    "show_debug_overlay": self.DebugOverlayVisible,
+                    "water_point": self.WaterCastingTargetLocation,
+                    "kp": self.ProportionalGainCoefficient,
+                    "kd": self.DerivativeGainCoefficient,
+                    "pd_clamp": self.ControlSignalMaximumClamp,
+                    "cast_hold_duration": self.MouseHoldDurationForCast,
+                    "recast_timeout": self.MaximumWaitTimeBeforeRecast,
+                    "fish_end_delay": self.DelayAfterFishCaptured,
+                    "rod_hotkey": self.FishingRodInventorySlot,
+                    "anything_else_hotkey": self.AlternateInventorySlot,
+                    "auto_buy_common_bait": self.AutomaticBaitPurchaseEnabled,
+                    "auto_store_devil_fruit": self.AutomaticFruitStorageEnabled,
+                    "auto_select_top_bait": self.AutomaticTopBaitSelectionEnabled,
+                    "left_point": self.ShopLeftButtonLocation,
+                    "middle_point": self.ShopCenterButtonLocation,
+                    "right_point": self.ShopRightButtonLocation,
+                    "loops_per_purchase": self.BaitPurchaseFrequencyCounter,
+                    "store_fruit_point": self.FruitStorageButtonLocation,
+                    "devil_fruit_hotkey": self.DevilFruitInventorySlot,
+                    "bait_point": self.BaitSelectionButtonLocation,
+                    "pd_approaching_damping": self.PDControllerApproachingStateDamping,
+                    "pd_chasing_damping": self.PDControllerChasingStateDamping,
+                    "gap_tolerance_multiplier": self.BarGroupingGapToleranceMultiplier,
+                    "state_resend_interval": self.InputStateResendFrequency
+                }, ConfigurationFileHandle, indent=4)
+        except Exception as SaveError:
+            print(f"Error saving settings: {SaveError}")
     
-    def setupHotkeys(self):
+    def RegisterAllHotkeyBindings(self):
         try:
-            keyboard.add_hotkey(self.hotkeys["start_stop"], self.toggleMacro)
-            keyboard.add_hotkey(self.hotkeys["change_area"], self.changeArea)
-            keyboard.add_hotkey(self.hotkeys["exit"], self.forceExit)
-        except Exception as e:
-            print(f"Error setting up hotkeys: {e}")
+            keyboard.add_hotkey(self.GlobalHotkeyBindings["start_stop"], self.ToggleMacroExecution)
+            keyboard.add_hotkey(self.GlobalHotkeyBindings["change_area"], self.ModifyScanningRegion)
+            keyboard.add_hotkey(self.GlobalHotkeyBindings["exit"], self.TerminateApplicationImmediately)
+        except Exception as HotkeyError:
+            print(f"Error setting up hotkeys: {HotkeyError}")
     
-    def toggleMacro(self):
-        self.isRunning = not self.isRunning
+    def ToggleMacroExecution(self):
+        self.MacroCurrentlyExecuting = not self.MacroCurrentlyExecuting
         
-        if self.isRunning:
-            self.currentSessionStartTime = time.time()
-            self.hasFocusedRoblox = False
-            threading.Thread(target=self.mainLoop, daemon=True).start()
+        if self.MacroCurrentlyExecuting:
+            self.CurrentSessionBeginTimestamp = time.time()
+            self.RobloxWindowAlreadyFocused = False
+            threading.Thread(target=self.ExecutePrimaryMacroLoop, daemon=True).start()
         else:
-            if self.currentSessionStartTime:
-                self.totalElapsedTime += time.time() - self.currentSessionStartTime
-                self.currentSessionStartTime = None
-            if self.isHoldingClick:
+            if self.CurrentSessionBeginTimestamp:
+                self.CumulativeRunningTimeSeconds += time.time() - self.CurrentSessionBeginTimestamp
+                self.CurrentSessionBeginTimestamp = None
+            if self.MouseButtonCurrentlyPressed:
                 pyautogui.mouseUp()
-                self.isHoldingClick = False
+                self.MouseButtonCurrentlyPressed = False
     
-    def changeArea(self):
-        if self.areaSelectorActive:
-            if self.areaSelector:
+    def ModifyScanningRegion(self):
+        if self.RegionSelectorCurrentlyActive:
+            if self.ActiveRegionSelectorInstance:
                 try:
-                    self.areaSelector.Window.after(10, self.areaSelector.Close)
+                    self.ActiveRegionSelectorInstance.RootWindow.after(10, self.ActiveRegionSelectorInstance.CloseWindow)
                 except:
                     pass
             return
         
-        self.areaSelectorActive = True
+        self.RegionSelectorCurrentlyActive = True
         
-        def runSelector():
+        def ExecuteRegionSelector():
             try:
-                self.areaSelector = AreaSelector(None, self.areaBox, self.onAreaSelected)
+                self.ActiveRegionSelectorInstance = RegionSelectionWindow(None, self.ScanningRegionBounds, self.HandleRegionSelectionComplete)
             finally:
-                self.areaSelectorActive = False
-                self.areaSelector = None
+                self.RegionSelectorCurrentlyActive = False
+                self.ActiveRegionSelectorInstance = None
         
-        threading.Thread(target=runSelector, daemon=True).start()
+        threading.Thread(target=ExecuteRegionSelector, daemon=True).start()
 
-    def onAreaSelected(self, coords):
-        self.areaBox = coords
-        self.saveSettings()
-        self.areaSelector = None
-        self.areaSelectorActive = False
+    def HandleRegionSelectionComplete(self, UpdatedCoordinates):
+        self.ScanningRegionBounds = UpdatedCoordinates
+        self.SaveConfigurationToDisk()
+        self.ActiveRegionSelectorInstance = None
+        self.RegionSelectorCurrentlyActive = False
     
-    def forceExit(self):
+    def TerminateApplicationImmediately(self):
         os._exit(0)
     
-    def setPoint(self, pointName):
-        if self.mouseListener:
-            self.mouseListener.stop()
+    def InitiatePointSelectionMode(self, AttributeNameToSet):
+        if self.MouseEventListenerInstance:
+            self.MouseEventListenerInstance.stop()
         
-        self.currentPointSetting = pointName
+        self.CurrentlySettingPointName = AttributeNameToSet
         
-        def onClick(x, y, button, pressed):
-            if pressed and self.currentPointSetting == pointName:
-                setattr(self, pointName, {"x": x, "y": y})
-                self.saveSettings()
-                self.currentPointSetting = None
+        def ProcessMouseClickEvent(ClickPositionX, ClickPositionY, ButtonPressed, IsPressed):
+            if IsPressed and self.CurrentlySettingPointName == AttributeNameToSet:
+                setattr(self, AttributeNameToSet, {"x": ClickPositionX, "y": ClickPositionY})
+                self.SaveConfigurationToDisk()
+                self.CurrentlySettingPointName = None
                 return False
         
-        self.mouseListener = mouse.Listener(on_click=onClick)
-        self.mouseListener.start()
+        self.MouseEventListenerInstance = mouse.Listener(on_click=ProcessMouseClickEvent)
+        self.MouseEventListenerInstance.start()
     
-    def mainLoop(self):
-        while self.isRunning:
+    def ExecutePrimaryMacroLoop(self):
+        while self.MacroCurrentlyExecuting:
             try:
-                self.lastError = None
-                self.lastDarkGrayY = None
-                self.lastScanTime = time.time()
+                self.PreviousControlLoopErrorValue = None
+                self.PreviousTargetBarVerticalPosition = None
+                self.LastImageScanTimestamp = time.time()
                 
-                if self.isHoldingClick:
+                if self.MouseButtonCurrentlyPressed:
                     pyautogui.mouseUp()
-                    self.isHoldingClick = False
+                    self.MouseButtonCurrentlyPressed = False
                 
-                if not self.isRunning:
+                if not self.MacroCurrentlyExecuting:
                     break
                 
-                if not self.preCast():
+                if not self.ExecutePreCastSequence():
                     continue
                 
-                if not self.isRunning:
+                if not self.MacroCurrentlyExecuting:
                     break
                 
-                if not self.waiting():
+                if not self.WaitForFishingBobberReady():
                     continue
                 
-                while self.isRunning:
-                    if not self.fishing():
+                while self.MacroCurrentlyExecuting:
+                    if not self.PerformActiveFishingControl():
                         break
                 
-                if self.isRunning:
-                    self.fishCaught += 1
-                    self.lastFishTime = time.time()
+                if self.MacroCurrentlyExecuting:
+                    self.TotalFishSuccessfullyCaught += 1
+                    self.MostRecentFishCaptureTimestamp = time.time()
                     
-                    delayRemaining = self.fishEndDelay
-                    while delayRemaining > 0 and self.isRunning:
-                        chunk = min(0.1, delayRemaining)
-                        time.sleep(chunk)
-                        delayRemaining -= chunk
+                    RemainingDelayTime = self.DelayAfterFishCaptured
+                    while RemainingDelayTime > 0 and self.MacroCurrentlyExecuting:
+                        DelayIncrement = min(0.1, RemainingDelayTime)
+                        time.sleep(DelayIncrement)
+                        RemainingDelayTime -= DelayIncrement
             
-            except Exception as e:
-                print(f"Error in Main: {e}")
+            except Exception as MainLoopError:
+                print(f"Error in Main: {MainLoopError}")
                 break
     
-    def preCast(self):
-        if not self.hasFocusedRoblox:
-            def findRobloxWindow(hwnd, windows):
-                if win32gui.IsWindowVisible(hwnd):
-                    title = win32gui.GetWindowText(hwnd)
-                    if "Roblox" in title:
-                        windows.append(hwnd)
+    def ExecutePreCastSequence(self):
+        if not self.RobloxWindowAlreadyFocused:
+            def LocateRobloxWindowHandle(WindowHandle, WindowCollection):
+                if win32gui.IsWindowVisible(WindowHandle):
+                    WindowTitleText = win32gui.GetWindowText(WindowHandle)
+                    if "Roblox" in WindowTitleText:
+                        WindowCollection.append(WindowHandle)
             
-            windows = []
-            win32gui.EnumWindows(findRobloxWindow, windows)
+            DiscoveredWindows = []
+            win32gui.EnumWindows(LocateRobloxWindowHandle, DiscoveredWindows)
             
-            if windows:
-                win32gui.SetForegroundWindow(windows[0])
-                time.sleep(self.robloxFocusDelay)
-                self.hasFocusedRoblox = True
-                time.sleep(self.robloxPostFocusDelay)
+            if DiscoveredWindows:
+                win32gui.SetForegroundWindow(DiscoveredWindows[0])
+                time.sleep(self.RobloxWindowFocusInitialDelay)
+                self.RobloxWindowAlreadyFocused = True
+                time.sleep(self.RobloxWindowFocusFollowupDelay)
 
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
-        if self.autoBuyCommonBait and self.leftPoint and self.middlePoint and self.rightPoint:
-            if self.baitPurchaseLoopCounter == 0 or self.baitPurchaseLoopCounter >= self.loopsPerPurchase:                
+        if self.AutomaticBaitPurchaseEnabled and self.ShopLeftButtonLocation and self.ShopCenterButtonLocation and self.ShopRightButtonLocation:
+            if self.BaitPurchaseIterationCounter == 0 or self.BaitPurchaseIterationCounter >= self.BaitPurchaseFrequencyCounter:                
                 keyboard.press_and_release('e')
-                time.sleep(self.preCastEDelay)
-                if not self.isRunning: return False
+                time.sleep(self.PreCastDialogOpenDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                ctypes.windll.user32.SetCursorPos(self.leftPoint['x'], self.leftPoint['y'])
-                time.sleep(self.preCastAntiDetectDelay)
+                ctypes.windll.user32.SetCursorPos(self.ShopLeftButtonLocation['x'], self.ShopLeftButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
                 ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-                time.sleep(self.preCastAntiDetectDelay)
+                time.sleep(self.PreCastAntiDetectionDelay)
                 pyautogui.click()
-                time.sleep(self.preCastClickDelay)
-                if not self.isRunning: return False
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                ctypes.windll.user32.SetCursorPos(self.middlePoint['x'], self.middlePoint['y'])
-                time.sleep(self.preCastAntiDetectDelay)
+                ctypes.windll.user32.SetCursorPos(self.ShopCenterButtonLocation['x'], self.ShopCenterButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
                 ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-                time.sleep(self.preCastAntiDetectDelay)
+                time.sleep(self.PreCastAntiDetectionDelay)
                 pyautogui.click()
-                time.sleep(self.preCastClickDelay)
-                if not self.isRunning: return False
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                keyboard.write(str(self.loopsPerPurchase))
-                time.sleep(self.preCastTypeDelay)
-                if not self.isRunning: return False
+                keyboard.write(str(self.BaitPurchaseFrequencyCounter))
+                time.sleep(self.PreCastKeyboardInputDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                ctypes.windll.user32.SetCursorPos(self.leftPoint['x'], self.leftPoint['y'])
-                time.sleep(self.preCastAntiDetectDelay)
+                ctypes.windll.user32.SetCursorPos(self.ShopLeftButtonLocation['x'], self.ShopLeftButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
                 ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-                time.sleep(self.preCastAntiDetectDelay)
+                time.sleep(self.PreCastAntiDetectionDelay)
                 pyautogui.click()
-                time.sleep(self.preCastClickDelay)
-                if not self.isRunning: return False
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                ctypes.windll.user32.SetCursorPos(self.rightPoint['x'], self.rightPoint['y'])
-                time.sleep(self.preCastAntiDetectDelay)
+                ctypes.windll.user32.SetCursorPos(self.ShopRightButtonLocation['x'], self.ShopRightButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
                 ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-                time.sleep(self.preCastAntiDetectDelay)
+                time.sleep(self.PreCastAntiDetectionDelay)
                 pyautogui.click()
-                time.sleep(self.preCastClickDelay)
-                if not self.isRunning: return False
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
                 
-                ctypes.windll.user32.SetCursorPos(self.middlePoint['x'], self.middlePoint['y'])
-                time.sleep(self.preCastAntiDetectDelay)
+                ctypes.windll.user32.SetCursorPos(self.ShopCenterButtonLocation['x'], self.ShopCenterButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
                 ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-                time.sleep(self.preCastAntiDetectDelay)
+                time.sleep(self.PreCastAntiDetectionDelay)
                 pyautogui.click()
-                time.sleep(self.preCastClickDelay)
+                time.sleep(self.PreCastMouseClickDelay)
                 
-                self.baitPurchaseLoopCounter = 1
+                self.BaitPurchaseIterationCounter = 1
             else:
-                self.baitPurchaseLoopCounter += 1
+                self.BaitPurchaseIterationCounter += 1
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
-        if self.autoStoreDevilFruit and self.storeFruitPoint:
-            keyboard.press_and_release(self.devilFruitHotkey)
-            time.sleep(self.storeFruitHotkeyDelay)
-            if not self.isRunning: return False
+        if self.AutomaticFruitStorageEnabled and self.FruitStorageButtonLocation:
+            keyboard.press_and_release(self.DevilFruitInventorySlot)
+            time.sleep(self.FruitStorageHotkeyActivationDelay)
+            if not self.MacroCurrentlyExecuting: return False
             
-            ctypes.windll.user32.SetCursorPos(self.storeFruitPoint['x'], self.storeFruitPoint['y'])
-            time.sleep(self.preCastAntiDetectDelay)
+            ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
+            time.sleep(self.PreCastAntiDetectionDelay)
             ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-            time.sleep(self.preCastAntiDetectDelay)
+            time.sleep(self.PreCastAntiDetectionDelay)
             pyautogui.click()
-            time.sleep(self.storeFruitClickDelay)
-            if not self.isRunning: return False
+            time.sleep(self.FruitStorageClickConfirmationDelay)
+            if not self.MacroCurrentlyExecuting: return False
             
             keyboard.press_and_release('shift')
-            time.sleep(self.storeFruitShiftDelay)
-            if not self.isRunning: return False
+            time.sleep(self.FruitStorageShiftKeyPressDelay)
+            if not self.MacroCurrentlyExecuting: return False
             
             keyboard.press_and_release('backspace')
-            time.sleep(self.storeFruitBackspaceDelay)
-            if not self.isRunning: return False
+            time.sleep(self.FruitStorageBackspaceDeletionDelay)
+            if not self.MacroCurrentlyExecuting: return False
             
             keyboard.press_and_release('shift')
 
         return True
     
-    def waiting(self):
-        if not self.waterPoint:
+    def WaitForFishingBobberReady(self):
+        if not self.WaterCastingTargetLocation:
             return False
         
-        keyboard.press_and_release(self.anythingElseHotkey)
-        time.sleep(self.rodSelectDelay)
+        keyboard.press_and_release(self.AlternateInventorySlot)
+        time.sleep(self.InventorySlotSwitchingDelay)
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
-        keyboard.press_and_release(self.rodHotkey)
-        time.sleep(self.rodSelectDelay)
+        keyboard.press_and_release(self.FishingRodInventorySlot)
+        time.sleep(self.InventorySlotSwitchingDelay)
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
-        if self.autoSelectTopBait and self.baitPoint:
-            ctypes.windll.user32.SetCursorPos(self.baitPoint['x'], self.baitPoint['y'])
-            time.sleep(self.preCastAntiDetectDelay)
+        if self.AutomaticTopBaitSelectionEnabled and self.BaitSelectionButtonLocation:
+            ctypes.windll.user32.SetCursorPos(self.BaitSelectionButtonLocation['x'], self.BaitSelectionButtonLocation['y'])
+            time.sleep(self.PreCastAntiDetectionDelay)
             ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
-            time.sleep(self.preCastAntiDetectDelay)
+            time.sleep(self.PreCastAntiDetectionDelay)
             pyautogui.click()
-            time.sleep(self.autoSelectBaitDelay)
+            time.sleep(self.BaitSelectionConfirmationDelay)
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
-        ctypes.windll.user32.SetCursorPos(self.waterPoint['x'], self.waterPoint['y'])
-        time.sleep(self.cursorAntiDetectDelay)
+        ctypes.windll.user32.SetCursorPos(self.WaterCastingTargetLocation['x'], self.WaterCastingTargetLocation['y'])
+        time.sleep(self.MouseMovementAntiDetectionDelay)
         ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             return False
         
         pyautogui.mouseDown()
-        time.sleep(self.castHoldDuration)
+        time.sleep(self.MouseHoldDurationForCast)
         
-        if not self.isRunning:
+        if not self.MacroCurrentlyExecuting:
             pyautogui.mouseUp()
             return False
         
         pyautogui.mouseUp()
         
-        startTime = time.time()
-        targetBlue = np.array([85, 170, 255])
-        targetWhite = np.array([255, 255, 255])
-        targetDarkGray = np.array([25, 25, 25])
+        CastingStartTime = time.time()
+        BobberBlueColor = np.array([85, 170, 255])
+        BobberWhiteColor = np.array([255, 255, 255])
+        BobberDarkGrayColor = np.array([25, 25, 25])
         
-        while self.isRunning:
-            elapsedTime = time.time() - startTime
+        while self.MacroCurrentlyExecuting:
+            ElapsedWaitTime = time.time() - CastingStartTime
             
-            if elapsedTime >= self.recastTimeout:
+            if ElapsedWaitTime >= self.MaximumWaitTimeBeforeRecast:
                 return False
             
-            with mss.mss() as sct:
-                monitor = {
-                    "top": self.areaBox["y1"],
-                    "left": self.areaBox["x1"],
-                    "width": self.areaBox["x2"] - self.areaBox["x1"],
-                    "height": self.areaBox["y2"] - self.areaBox["y1"]
+            with mss.mss() as ScreenCapture:
+                CaptureRegion = {
+                    "top": self.ScanningRegionBounds["y1"],
+                    "left": self.ScanningRegionBounds["x1"],
+                    "width": self.ScanningRegionBounds["x2"] - self.ScanningRegionBounds["x1"],
+                    "height": self.ScanningRegionBounds["y2"] - self.ScanningRegionBounds["y1"]
                 }
-                screenshot = sct.grab(monitor)
-                img = np.array(screenshot)
+                CapturedScreen = ScreenCapture.grab(CaptureRegion)
+                ScreenImageArray = np.array(CapturedScreen)
             
-            if self.checkBlackScreen(img):
-                if not self.handleAntiMacroScreen():
+            if self.DetectBlackScreenCondition(ScreenImageArray):
+                if not self.HandleAntiMacroDetection():
                     return False
                 continue
             
-            blueMask = ((img[:, :, 2] == targetBlue[0]) & 
-                       (img[:, :, 1] == targetBlue[1]) & 
-                       (img[:, :, 0] == targetBlue[2]))
-            whiteMask = ((img[:, :, 2] == targetWhite[0]) & 
-                        (img[:, :, 1] == targetWhite[1]) & 
-                        (img[:, :, 0] == targetWhite[2]))
-            darkGrayMask = ((img[:, :, 2] == targetDarkGray[0]) & 
-                           (img[:, :, 1] == targetDarkGray[1]) & 
-                           (img[:, :, 0] == targetDarkGray[2]))
+            BluePixelMask = ((ScreenImageArray[:, :, 2] == BobberBlueColor[0]) & 
+                       (ScreenImageArray[:, :, 1] == BobberBlueColor[1]) & 
+                       (ScreenImageArray[:, :, 0] == BobberBlueColor[2]))
+            WhitePixelMask = ((ScreenImageArray[:, :, 2] == BobberWhiteColor[0]) & 
+                        (ScreenImageArray[:, :, 1] == BobberWhiteColor[1]) & 
+                        (ScreenImageArray[:, :, 0] == BobberWhiteColor[2]))
+            DarkGrayPixelMask = ((ScreenImageArray[:, :, 2] == BobberDarkGrayColor[0]) & 
+                           (ScreenImageArray[:, :, 1] == BobberDarkGrayColor[1]) & 
+                           (ScreenImageArray[:, :, 0] == BobberDarkGrayColor[2]))
             
-            blueFound = np.any(blueMask)
-            whiteFound = np.any(whiteMask)
-            darkGrayFound = np.any(darkGrayMask)
+            BlueColorDetected = np.any(BluePixelMask)
+            WhiteColorDetected = np.any(WhitePixelMask)
+            DarkGrayColorDetected = np.any(DarkGrayPixelMask)
             
-            if blueFound and whiteFound and darkGrayFound:
+            if BlueColorDetected and WhiteColorDetected and DarkGrayColorDetected:
                 return True
             
-            time.sleep(self.scanLoopDelay)
+            time.sleep(self.ImageProcessingLoopDelay)
         
         return False
     
-    def checkBlackScreen(self, img=None):
-        if img is None:
-            with mss.mss() as sct:
-                monitor = {
-                    "top": self.areaBox["y1"],
-                    "left": self.areaBox["x1"],
-                    "width": self.areaBox["x2"] - self.areaBox["x1"],
-                    "height": self.areaBox["y2"] - self.areaBox["y1"]
+    def DetectBlackScreenCondition(self, ImageArrayToCheck=None):
+        if ImageArrayToCheck is None:
+            with mss.mss() as ScreenCapture:
+                CaptureRegion = {
+                    "top": self.ScanningRegionBounds["y1"],
+                    "left": self.ScanningRegionBounds["x1"],
+                    "width": self.ScanningRegionBounds["x2"] - self.ScanningRegionBounds["x1"],
+                    "height": self.ScanningRegionBounds["y2"] - self.ScanningRegionBounds["y1"]
                 }
-                screenshot = sct.grab(monitor)
-                img = np.array(screenshot)
+                CapturedScreen = ScreenCapture.grab(CaptureRegion)
+                ImageArrayToCheck = np.array(CapturedScreen)
         
-        blackMask = ((img[:, :, 2] == 0) & (img[:, :, 1] == 0) & (img[:, :, 0] == 0))
-        blackPixelCount = np.sum(blackMask)
-        totalPixels = img.shape[0] * img.shape[1]
-        blackPercentage = blackPixelCount / totalPixels
+        BlackPixelMask = ((ImageArrayToCheck[:, :, 2] == 0) & (ImageArrayToCheck[:, :, 1] == 0) & (ImageArrayToCheck[:, :, 0] == 0))
+        TotalBlackPixelCount = np.sum(BlackPixelMask)
+        TotalPixelCount = ImageArrayToCheck.shape[0] * ImageArrayToCheck.shape[1]
+        BlackPixelRatio = TotalBlackPixelCount / TotalPixelCount
         
-        return blackPercentage >= self.blackScreenThreshold
+        return BlackPixelRatio >= self.BlackScreenDetectionRatioThreshold
     
-    def handleAntiMacroScreen(self):
-        attempts = 0
-        maxAttempts = 20
+    def HandleAntiMacroDetection(self):
+        RetryAttemptCount = 0
+        MaximumRetryAttempts = 20
         
-        while self.isRunning and attempts < maxAttempts:
-            if not self.checkBlackScreen():
+        while self.MacroCurrentlyExecuting and RetryAttemptCount < MaximumRetryAttempts:
+            if not self.DetectBlackScreenCondition():
                 return True
             
-            keyboard.press_and_release(self.anythingElseHotkey)
-            time.sleep(self.antiMacroSpamDelay)
-            attempts += 1
+            keyboard.press_and_release(self.AlternateInventorySlot)
+            time.sleep(self.AntiMacroDialogSpamDelay)
+            RetryAttemptCount += 1
         
         return False
     
-    def fishing(self):
-        with mss.mss() as sct:
-            monitor = {
-                "top": self.areaBox["y1"],
-                "left": self.areaBox["x1"],
-                "width": self.areaBox["x2"] - self.areaBox["x1"],
-                "height": self.areaBox["y2"] - self.areaBox["y1"]
+    def PerformActiveFishingControl(self):
+        with mss.mss() as ScreenCapture:
+            CaptureRegion = {
+                "top": self.ScanningRegionBounds["y1"],
+                "left": self.ScanningRegionBounds["x1"],
+                "width": self.ScanningRegionBounds["x2"] - self.ScanningRegionBounds["x1"],
+                "height": self.ScanningRegionBounds["y2"] - self.ScanningRegionBounds["y1"]
             }
-            screenshot = sct.grab(monitor)
-            img = np.array(screenshot)
+            CapturedScreen = ScreenCapture.grab(CaptureRegion)
+            ScreenImageArray = np.array(CapturedScreen)
         
-        if self.checkBlackScreen(img):
-            if self.isHoldingClick:
+        if self.DetectBlackScreenCondition(ScreenImageArray):
+            if self.MouseButtonCurrentlyPressed:
                 pyautogui.mouseUp()
-                self.isHoldingClick = False
-            self.handleAntiMacroScreen()
+                self.MouseButtonCurrentlyPressed = False
+            self.HandleAntiMacroDetection()
             return False
         
-        targetColor = np.array([85, 170, 255])
-        colorMask = ((img[:, :, 2] == targetColor[0]) & 
-                    (img[:, :, 1] == targetColor[1]) & 
-                    (img[:, :, 0] == targetColor[2]))
+        BobberBlueColor = np.array([85, 170, 255])
+        BluePixelMask = ((ScreenImageArray[:, :, 2] == BobberBlueColor[0]) & 
+                    (ScreenImageArray[:, :, 1] == BobberBlueColor[1]) & 
+                    (ScreenImageArray[:, :, 0] == BobberBlueColor[2]))
         
-        if not np.any(colorMask):
-            if self.isHoldingClick:
+        if not np.any(BluePixelMask):
+            if self.MouseButtonCurrentlyPressed:
                 pyautogui.mouseUp()
-                self.isHoldingClick = False
+                self.MouseButtonCurrentlyPressed = False
             return False
         
-        yCoords, xCoords = np.where(colorMask)
-        middleX = int(np.mean(xCoords))
+        BluePixelYCoordinates, BluePixelXCoordinates = np.where(BluePixelMask)
+        HorizontalCenterPosition = int(np.mean(BluePixelXCoordinates))
         
-        croppedSlice = img[:, middleX:middleX+1, :]
+        VerticalSliceArray = ScreenImageArray[:, HorizontalCenterPosition:HorizontalCenterPosition+1, :]
         
-        targetGray = np.array([25, 25, 25])
-        grayMask = ((croppedSlice[:, 0, 2] == targetGray[0]) & 
-                   (croppedSlice[:, 0, 1] == targetGray[1]) & 
-                   (croppedSlice[:, 0, 0] == targetGray[2]))
+        BoundaryGrayColor = np.array([25, 25, 25])
+        GrayPixelMask = ((VerticalSliceArray[:, 0, 2] == BoundaryGrayColor[0]) & 
+                (VerticalSliceArray[:, 0, 1] == BoundaryGrayColor[1]) & 
+                (VerticalSliceArray[:, 0, 0] == BoundaryGrayColor[2]))
         
-        if not np.any(grayMask):
+        if not np.any(GrayPixelMask):
             return True
         
-        grayYCoords = np.where(grayMask)[0]
-        topGrayY = grayYCoords[0]
-        bottomGrayY = grayYCoords[-1]
-        finalSlice = croppedSlice[topGrayY:bottomGrayY+1, :, :]
+        GrayPixelYCoordinates = np.where(GrayPixelMask)[0]
+        TopBoundaryPosition = GrayPixelYCoordinates[0]
+        BottomBoundaryPosition = GrayPixelYCoordinates[-1]
+        BoundedSliceArray = VerticalSliceArray[TopBoundaryPosition:BottomBoundaryPosition+1, :, :]
         
-        targetWhite = np.array([255, 255, 255])
-        whiteMask = ((finalSlice[:, 0, 2] == targetWhite[0]) & 
-                    (finalSlice[:, 0, 1] == targetWhite[1]) & 
-                    (finalSlice[:, 0, 0] == targetWhite[2]))
+        IndicatorWhiteColor = np.array([255, 255, 255])
+        WhitePixelMask = ((BoundedSliceArray[:, 0, 2] == IndicatorWhiteColor[0]) & 
+                    (BoundedSliceArray[:, 0, 1] == IndicatorWhiteColor[1]) & 
+                    (BoundedSliceArray[:, 0, 0] == IndicatorWhiteColor[2]))
         
-        if not np.any(whiteMask):
+        if not np.any(WhitePixelMask):
             return True
         
-        whiteYCoords = np.where(whiteMask)[0]
-        topWhiteYRelative = whiteYCoords[0]
-        bottomWhiteYRelative = whiteYCoords[-1]
-        whiteHeight = bottomWhiteYRelative - topWhiteYRelative + 1
-        middleWhiteYRelative = (topWhiteYRelative + bottomWhiteYRelative) // 2
-        middleWhiteYScreen = self.areaBox["y1"] + topGrayY + middleWhiteYRelative
+        WhitePixelYCoordinates = np.where(WhitePixelMask)[0]
+        WhiteBarTopPosition = WhitePixelYCoordinates[0]
+        WhiteBarBottomPosition = WhitePixelYCoordinates[-1]
+        WhiteBarHeight = WhiteBarBottomPosition - WhiteBarTopPosition + 1
+        WhiteBarCenterPosition = (WhiteBarTopPosition + WhiteBarBottomPosition) // 2
+        WhiteBarCenterScreenY = self.ScanningRegionBounds["y1"] + TopBoundaryPosition + WhiteBarCenterPosition
         
-        targetDarkGray = np.array([25, 25, 25])
-        darkGrayMask = ((finalSlice[:, 0, 2] == targetDarkGray[0]) & 
-                       (finalSlice[:, 0, 1] == targetDarkGray[1]) & 
-                       (finalSlice[:, 0, 0] == targetDarkGray[2]))
+        TargetDarkGrayColor = np.array([25, 25, 25])
+        DarkGrayPixelMask = ((BoundedSliceArray[:, 0, 2] == TargetDarkGrayColor[0]) & 
+                    (BoundedSliceArray[:, 0, 1] == TargetDarkGrayColor[1]) & 
+                    (BoundedSliceArray[:, 0, 0] == TargetDarkGrayColor[2]))
         
-        if not np.any(darkGrayMask):
+        if not np.any(DarkGrayPixelMask):
+            if self.MouseButtonCurrentlyPressed:
+                pyautogui.mouseUp()
+                self.MouseButtonCurrentlyPressed = False
+                
             return True
         
-        darkGrayYCoords = np.where(darkGrayMask)[0]
-        gapTolerance = whiteHeight * self.gapToleranceMultiplier
+        DarkGrayPixelYCoordinates = np.where(DarkGrayPixelMask)[0]
+        MaximumAllowedGap = WhiteBarHeight * self.BarGroupingGapToleranceMultiplier
         
-        groups = []
-        currentGroup = [darkGrayYCoords[0]]
+        PixelGroupCollections = []
+        ActivePixelGroup = [DarkGrayPixelYCoordinates[0]]
         
-        for i in range(1, len(darkGrayYCoords)):
-            if darkGrayYCoords[i] - darkGrayYCoords[i-1] <= gapTolerance:
-                currentGroup.append(darkGrayYCoords[i])
+        for IndexPosition in range(1, len(DarkGrayPixelYCoordinates)):
+            if DarkGrayPixelYCoordinates[IndexPosition] - DarkGrayPixelYCoordinates[IndexPosition-1] <= MaximumAllowedGap:
+                ActivePixelGroup.append(DarkGrayPixelYCoordinates[IndexPosition])
             else:
-                groups.append(currentGroup)
-                currentGroup = [darkGrayYCoords[i]]
+                PixelGroupCollections.append(ActivePixelGroup)
+                ActivePixelGroup = [DarkGrayPixelYCoordinates[IndexPosition]]
         
-        groups.append(currentGroup)
+        PixelGroupCollections.append(ActivePixelGroup)
         
-        biggestGroup = max(groups, key=len)
-        biggestGroupMiddle = (biggestGroup[0] + biggestGroup[-1]) // 2
-        biggestGroupMiddleYScreen = self.areaBox["y1"] + topGrayY + biggestGroupMiddle
+        LargestPixelGroup = max(PixelGroupCollections, key=len)
+        LargestGroupCenterPosition = (LargestPixelGroup[0] + LargestPixelGroup[-1]) // 2
+        LargestGroupCenterScreenY = self.ScanningRegionBounds["y1"] + TopBoundaryPosition + LargestGroupCenterPosition
         
-        kp = self.kp
-        kd = self.kd
-        pdClamp = self.pdClamp
+        ProportionalGain = self.ProportionalGainCoefficient
+        DerivativeGain = self.DerivativeGainCoefficient
+        MaximumControlClamp = self.ControlSignalMaximumClamp
         
-        error = middleWhiteYScreen - biggestGroupMiddleYScreen
-        pTerm = kp * error
-        dTerm = 0.0
+        CurrentPositionError = WhiteBarCenterScreenY - LargestGroupCenterScreenY
+        ProportionalControlTerm = ProportionalGain * CurrentPositionError
+        DerivativeControlTerm = 0.0
         
-        currentTime = time.time()
-        timeDelta = currentTime - self.lastScanTime
+        CurrentTimestamp = time.time()
+        TimeDifference = CurrentTimestamp - self.LastImageScanTimestamp
         
-        if self.lastError is not None and self.lastDarkGrayY is not None and timeDelta > 0.001:
-            darkGrayVelocity = (biggestGroupMiddleYScreen - self.lastDarkGrayY) / timeDelta
-            errorMagnitudeDecreasing = abs(error) < abs(self.lastError)
-            barMovingTowardTarget = (darkGrayVelocity > 0 and error > 0) or (darkGrayVelocity < 0 and error < 0)
+        if self.PreviousControlLoopErrorValue is not None and self.PreviousTargetBarVerticalPosition is not None and TimeDifference > 0.001:
+            TargetBarVelocity = (LargestGroupCenterScreenY - self.PreviousTargetBarVerticalPosition) / TimeDifference
+            ErrorDecreasingInMagnitude = abs(CurrentPositionError) < abs(self.PreviousControlLoopErrorValue)
+            TargetMovingTowardIndicator = (TargetBarVelocity > 0 and CurrentPositionError > 0) or (TargetBarVelocity < 0 and CurrentPositionError < 0)
             
-            if errorMagnitudeDecreasing and barMovingTowardTarget:
-                dampingMultiplier = self.pdApproachingDamping
-                dTerm = -kd * dampingMultiplier * darkGrayVelocity
+            if ErrorDecreasingInMagnitude and TargetMovingTowardIndicator:
+                AppliedDampingMultiplier = self.PDControllerApproachingStateDamping
+                DerivativeControlTerm = -DerivativeGain * AppliedDampingMultiplier * TargetBarVelocity
             else:
-                dampingMultiplier = self.pdChasingDamping
-                dTerm = -kd * dampingMultiplier * darkGrayVelocity
+                AppliedDampingMultiplier = self.PDControllerChasingStateDamping
+                DerivativeControlTerm = -DerivativeGain * AppliedDampingMultiplier * TargetBarVelocity
         
-        controlSignal = pTerm + dTerm
-        controlSignal = max(-pdClamp, min(pdClamp, controlSignal))
-        shouldHold = controlSignal <= 0
+        FinalControlSignal = ProportionalControlTerm + DerivativeControlTerm
+        FinalControlSignal = max(-MaximumControlClamp, min(MaximumControlClamp, FinalControlSignal))
+        ShouldHoldMouseButton = FinalControlSignal <= 0
         
-        if shouldHold and not self.isHoldingClick:
+        if ShouldHoldMouseButton and not self.MouseButtonCurrentlyPressed:
             pyautogui.mouseDown()
-            self.isHoldingClick = True
-            self.lastStateChangeTime = currentTime
-            self.lastInputResendTime = currentTime
-        elif not shouldHold and self.isHoldingClick:
+            self.MouseButtonCurrentlyPressed = True
+            self.LastControlStateChangeTimestamp = CurrentTimestamp
+            self.LastInputResendTimestamp = CurrentTimestamp
+        elif not ShouldHoldMouseButton and self.MouseButtonCurrentlyPressed:
             pyautogui.mouseUp()
-            self.isHoldingClick = False
-            self.lastStateChangeTime = currentTime
-            self.lastInputResendTime = currentTime
+            self.MouseButtonCurrentlyPressed = False
+            self.LastControlStateChangeTimestamp = CurrentTimestamp
+            self.LastInputResendTimestamp = CurrentTimestamp
         else:
-            timeSinceLastResend = currentTime - self.lastInputResendTime
+            TimeSinceLastResend = CurrentTimestamp - self.LastInputResendTimestamp
             
-            if timeSinceLastResend >= self.stateResendInterval:
-                if self.isHoldingClick:
+            if TimeSinceLastResend >= self.InputStateResendFrequency:
+                if self.MouseButtonCurrentlyPressed:
                     pyautogui.mouseDown()
                 else:
                     pyautogui.mouseUp()
-                self.lastInputResendTime = currentTime
+                self.LastInputResendTimestamp = CurrentTimestamp
         
-        self.lastError = error
-        self.lastDarkGrayY = biggestGroupMiddleYScreen
-        self.lastScanTime = currentTime
+        self.PreviousControlLoopErrorValue = CurrentPositionError
+        self.PreviousTargetBarVerticalPosition = LargestGroupCenterScreenY
+        self.LastImageScanTimestamp = CurrentTimestamp
         
         return True
     
-    def getState(self):
-        fishPerHour = 0.0
-        timeElapsed = "0:00:00"
-        totalTime = self.totalElapsedTime
+    def RetrieveCurrentSystemState(self):
+        CalculatedFishPerHour = 0.0
+        FormattedElapsedTime = "0:00:00"
+        AccumulatedTime = self.CumulativeRunningTimeSeconds
         
-        if self.currentSessionStartTime:
-            currentSessionTime = time.time() - self.currentSessionStartTime
-            totalTime = self.totalElapsedTime + currentSessionTime
+        if self.CurrentSessionBeginTimestamp:
+            CurrentActiveSessionTime = time.time() - self.CurrentSessionBeginTimestamp
+            AccumulatedTime = self.CumulativeRunningTimeSeconds + CurrentActiveSessionTime
         
-        if totalTime > 0:
-            hours = int(totalTime // 3600)
-            minutes = int((totalTime % 3600) // 60)
-            seconds = int(totalTime % 60)
-            timeElapsed = f"{hours}:{minutes:02d}:{seconds:02d}"
-            fishPerHour = (self.fishCaught / totalTime) * 3600
+        if AccumulatedTime > 0:
+            TotalHours = int(AccumulatedTime // 3600)
+            TotalMinutes = int((AccumulatedTime % 3600) // 60)
+            TotalSeconds = int(AccumulatedTime % 60)
+            FormattedElapsedTime = f"{TotalHours}:{TotalMinutes:02d}:{TotalSeconds:02d}"
+            CalculatedFishPerHour = (self.TotalFishSuccessfullyCaught / AccumulatedTime) * 3600
         
         return {
-            "isRunning": self.isRunning,
-            "fishCaught": self.fishCaught,
-            "timeElapsed": timeElapsed,
-            "fishPerHour": round(fishPerHour, 1),
-            "waterPoint": self.waterPoint,
-            "leftPoint": self.leftPoint,
-            "middlePoint": self.middlePoint,
-            "rightPoint": self.rightPoint,
-            "storeFruitPoint": self.storeFruitPoint,
-            "baitPoint": self.baitPoint,
-            "hotkeys": self.hotkeys,
-            "rodHotkey": self.rodHotkey,
-            "anythingElseHotkey": self.anythingElseHotkey,
-            "devilFruitHotkey": self.devilFruitHotkey,
-            "alwaysOnTop": self.alwaysOnTop,
-            "showDebugOverlay": self.showDebugOverlay,
-            "autoBuyCommonBait": self.autoBuyCommonBait,
-            "autoStoreDevilFruit": self.autoStoreDevilFruit,
-            "autoSelectTopBait": self.autoSelectTopBait,
-            "kp": self.kp,
-            "kd": self.kd,
-            "pdClamp": self.pdClamp,
-            "castHoldDuration": self.castHoldDuration,
-            "recastTimeout": self.recastTimeout,
-            "fishEndDelay": self.fishEndDelay,
-            "loopsPerPurchase": self.loopsPerPurchase,
-            "pdApproachingDamping": self.pdApproachingDamping,
-            "pdChasingDamping": self.pdChasingDamping,
-            "gapToleranceMultiplier": self.gapToleranceMultiplier,
-            "stateResendInterval": self.stateResendInterval,
-            "robloxFocusDelay": self.robloxFocusDelay,
-            "robloxPostFocusDelay": self.robloxPostFocusDelay,
-            "preCastEDelay": self.preCastEDelay,
-            "preCastClickDelay": self.preCastClickDelay,
-            "preCastTypeDelay": self.preCastTypeDelay,
-            "preCastAntiDetectDelay": self.preCastAntiDetectDelay,
-            "storeFruitHotkeyDelay": self.storeFruitHotkeyDelay,
-            "storeFruitClickDelay": self.storeFruitClickDelay,
-            "storeFruitShiftDelay": self.storeFruitShiftDelay,
-            "storeFruitBackspaceDelay": self.storeFruitBackspaceDelay,
-            "autoSelectBaitDelay": self.autoSelectBaitDelay,
-            "blackScreenThreshold": self.blackScreenThreshold,
-            "antiMacroSpamDelay": self.antiMacroSpamDelay,
-            "rodSelectDelay": self.rodSelectDelay,
-            "cursorAntiDetectDelay": self.cursorAntiDetectDelay,
-            "scanLoopDelay": self.scanLoopDelay
+            "isRunning": self.MacroCurrentlyExecuting,
+            "fishCaught": self.TotalFishSuccessfullyCaught,
+            "timeElapsed": FormattedElapsedTime,
+            "fishPerHour": round(CalculatedFishPerHour, 1),
+            "waterPoint": self.WaterCastingTargetLocation,
+            "leftPoint": self.ShopLeftButtonLocation,
+            "middlePoint": self.ShopCenterButtonLocation,
+            "rightPoint": self.ShopRightButtonLocation,
+            "storeFruitPoint": self.FruitStorageButtonLocation,
+            "baitPoint": self.BaitSelectionButtonLocation,
+            "hotkeys": self.GlobalHotkeyBindings,
+            "rodHotkey": self.FishingRodInventorySlot,
+            "anythingElseHotkey": self.AlternateInventorySlot,
+            "devilFruitHotkey": self.DevilFruitInventorySlot,
+            "alwaysOnTop": self.WindowAlwaysOnTopEnabled,
+            "showDebugOverlay": self.DebugOverlayVisible,
+            "autoBuyCommonBait": self.AutomaticBaitPurchaseEnabled,
+            "autoStoreDevilFruit": self.AutomaticFruitStorageEnabled,
+            "autoSelectTopBait": self.AutomaticTopBaitSelectionEnabled,
+            "kp": self.ProportionalGainCoefficient,
+            "kd": self.DerivativeGainCoefficient,
+            "pdClamp": self.ControlSignalMaximumClamp,
+            "castHoldDuration": self.MouseHoldDurationForCast,
+            "recastTimeout": self.MaximumWaitTimeBeforeRecast,
+            "fishEndDelay": self.DelayAfterFishCaptured,
+            "loopsPerPurchase": self.BaitPurchaseFrequencyCounter,
+            "pdApproachingDamping": self.PDControllerApproachingStateDamping,
+            "pdChasingDamping": self.PDControllerChasingStateDamping,
+            "gapToleranceMultiplier": self.BarGroupingGapToleranceMultiplier,
+            "stateResendInterval": self.InputStateResendFrequency,
+            "robloxFocusDelay": self.RobloxWindowFocusInitialDelay,
+            "robloxPostFocusDelay": self.RobloxWindowFocusFollowupDelay,
+            "preCastEDelay": self.PreCastDialogOpenDelay,
+            "preCastClickDelay": self.PreCastMouseClickDelay,
+            "preCastTypeDelay": self.PreCastKeyboardInputDelay,
+            "preCastAntiDetectDelay": self.PreCastAntiDetectionDelay,
+            "storeFruitHotkeyDelay": self.FruitStorageHotkeyActivationDelay,
+            "storeFruitClickDelay": self.FruitStorageClickConfirmationDelay,
+            "storeFruitShiftDelay": self.FruitStorageShiftKeyPressDelay,
+            "storeFruitBackspaceDelay": self.FruitStorageBackspaceDeletionDelay,
+            "autoSelectBaitDelay": self.BaitSelectionConfirmationDelay,
+            "blackScreenThreshold": self.BlackScreenDetectionRatioThreshold,
+            "antiMacroSpamDelay": self.AntiMacroDialogSpamDelay,
+            "rodSelectDelay": self.InventorySlotSwitchingDelay,
+            "cursorAntiDetectDelay": self.MouseMovementAntiDetectionDelay,
+            "scanLoopDelay": self.ImageProcessingLoopDelay
         }
 
-backend = FishingMacroBackend()
+MacroSystemInstance = AutomatedFishingSystem()
 
-@app.route('/state', methods=['GET'])
-def get_state():
-    return jsonify(backend.getState())
+@FlaskApplication.route('/state', methods=['GET'])
+def RetrieveSystemState():
+    return jsonify(MacroSystemInstance.RetrieveCurrentSystemState())
 
-@app.route('/set_window_property', methods=['POST'])
-def set_window_property():
+@FlaskApplication.route('/set_window_property', methods=['POST'])
+def ConfigureWindowProperty():
     try:
-        data = request.json
-        property_name = data.get('property')
+        IncomingData = request.json
+        RequestedProperty = IncomingData.get('property')
         
-        if property_name == 'always_on_top':
-            return jsonify({"alwaysOnTop": backend.alwaysOnTop})
+        if RequestedProperty == 'always_on_top':
+            return jsonify({"alwaysOnTop": MacroSystemInstance.WindowAlwaysOnTopEnabled})
         
         return jsonify({"status": "ok"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as ErrorDetails:
+        return jsonify({"status": "error", "message": str(ErrorDetails)}), 500
     
-@app.route('/command', methods=['POST'])
-def handle_command():
+@FlaskApplication.route('/command', methods=['POST'])
+def ProcessIncomingCommand():
     try:
-        data = request.json
-        action = data.get('action')
-        payload = data.get('payload')
+        IncomingData = request.json
+        RequestedAction = IncomingData.get('action')
+        ActionPayload = IncomingData.get('payload')
                 
-        if action == 'rebind_hotkey':
-            backend.isRebinding = payload
+        if RequestedAction == 'rebind_hotkey':
+            MacroSystemInstance.CurrentlyRebindingHotkey = ActionPayload
             keyboard.unhook_all_hotkeys()
             
-            def on_key_event(event):
-                if backend.isRebinding == payload:
-                    new_hotkey = event.name.lower()
-                    backend.hotkeys[payload] = new_hotkey
-                    backend.saveSettings()
-                    backend.isRebinding = None
-                    backend.setupHotkeys()
+            def HandleKeyboardEvent(PressedKeyEvent):
+                if MacroSystemInstance.CurrentlyRebindingHotkey == ActionPayload:
+                    NewHotkeyValue = PressedKeyEvent.name.lower()
+                    MacroSystemInstance.GlobalHotkeyBindings[ActionPayload] = NewHotkeyValue
+                    MacroSystemInstance.SaveConfigurationToDisk()
+                    MacroSystemInstance.CurrentlyRebindingHotkey = None
+                    MacroSystemInstance.RegisterAllHotkeyBindings()
             
-            keyboard.on_release(on_key_event, suppress=False)
+            keyboard.on_release(HandleKeyboardEvent, suppress=False)
             return jsonify({"status": "waiting_for_key"})
         
-        elif action == 'set_water_point':
-            backend.setPoint('waterPoint')
+        elif RequestedAction == 'set_water_point':
+            MacroSystemInstance.InitiatePointSelectionMode('WaterCastingTargetLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_left_point':
-            backend.setPoint('leftPoint')
+        elif RequestedAction == 'set_left_point':
+            MacroSystemInstance.InitiatePointSelectionMode('ShopLeftButtonLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_middle_point':
-            backend.setPoint('middlePoint')
+        elif RequestedAction == 'set_middle_point':
+            MacroSystemInstance.InitiatePointSelectionMode('ShopCenterButtonLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_right_point':
-            backend.setPoint('rightPoint')
+        elif RequestedAction == 'set_right_point':
+            MacroSystemInstance.InitiatePointSelectionMode('ShopRightButtonLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_store_fruit_point':
-            backend.setPoint('storeFruitPoint')
+        elif RequestedAction == 'set_store_fruit_point':
+            MacroSystemInstance.InitiatePointSelectionMode('FruitStorageButtonLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_bait_point':
-            backend.setPoint('baitPoint')
+        elif RequestedAction == 'set_bait_point':
+            MacroSystemInstance.InitiatePointSelectionMode('BaitSelectionButtonLocation')
             return jsonify({"status": "waiting_for_click"})
         
-        elif action == 'set_rod_hotkey':
-            backend.rodHotkey = payload
-            backend.saveSettings()
+        elif RequestedAction == 'set_rod_hotkey':
+            MacroSystemInstance.FishingRodInventorySlot = ActionPayload
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_anything_else_hotkey':
-            backend.anythingElseHotkey = payload
-            backend.saveSettings()
+        elif RequestedAction == 'set_anything_else_hotkey':
+            MacroSystemInstance.AlternateInventorySlot = ActionPayload
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_devil_fruit_hotkey':
-            backend.devilFruitHotkey = payload
-            backend.saveSettings()
+        elif RequestedAction == 'set_devil_fruit_hotkey':
+            MacroSystemInstance.DevilFruitInventorySlot = ActionPayload
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'toggle_always_on_top':
-            backend.alwaysOnTop = payload.lower() == 'true'
-            backend.saveSettings()
-            return jsonify({"status": "success", "value": backend.alwaysOnTop})
+        elif RequestedAction == 'toggle_always_on_top':
+            MacroSystemInstance.WindowAlwaysOnTopEnabled = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.WindowAlwaysOnTopEnabled})
 
-        elif action == 'toggle_debug_overlay':
-            backend.showDebugOverlay = payload.lower() == 'true'
-            backend.saveSettings()
-            return jsonify({"status": "success", "value": backend.showDebugOverlay})
+        elif RequestedAction == 'toggle_debug_overlay':
+            MacroSystemInstance.DebugOverlayVisible = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.DebugOverlayVisible})
         
-        elif action == 'toggle_auto_buy':
-            backend.autoBuyCommonBait = payload.lower() == 'true'
-            backend.saveSettings()
-            return jsonify({"status": "success", "value": backend.autoBuyCommonBait})
+        elif RequestedAction == 'toggle_auto_buy':
+            MacroSystemInstance.AutomaticBaitPurchaseEnabled = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.AutomaticBaitPurchaseEnabled})
         
-        elif action == 'toggle_auto_store':
-            backend.autoStoreDevilFruit = payload.lower() == 'true'
-            backend.saveSettings()
-            return jsonify({"status": "success", "value": backend.autoStoreDevilFruit})
+        elif RequestedAction == 'toggle_auto_store':
+            MacroSystemInstance.AutomaticFruitStorageEnabled = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.AutomaticFruitStorageEnabled})
 
-        elif action == 'toggle_auto_select_bait':
-            backend.autoSelectTopBait = payload.lower() == 'true'
-            backend.saveSettings()
-            return jsonify({"status": "success", "value": backend.autoSelectTopBait})
+        elif RequestedAction == 'toggle_auto_select_bait':
+            MacroSystemInstance.AutomaticTopBaitSelectionEnabled = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.AutomaticTopBaitSelectionEnabled})
         
-        elif action == 'set_kp':
-            backend.kp = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_kp':
+            MacroSystemInstance.ProportionalGainCoefficient = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_kd':
-            backend.kd = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_kd':
+            MacroSystemInstance.DerivativeGainCoefficient = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_pd_clamp':
-            backend.pdClamp = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_pd_clamp':
+            MacroSystemInstance.ControlSignalMaximumClamp = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_pd_approaching':
-            backend.pdApproachingDamping = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_pd_approaching':
+            MacroSystemInstance.PDControllerApproachingStateDamping = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_pd_chasing':
-            backend.pdChasingDamping = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_pd_chasing':
+            MacroSystemInstance.PDControllerChasingStateDamping = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_gap_tolerance':
-            backend.gapToleranceMultiplier = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_gap_tolerance':
+            MacroSystemInstance.BarGroupingGapToleranceMultiplier = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_cast_hold':
-            backend.castHoldDuration = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_cast_hold':
+            MacroSystemInstance.MouseHoldDurationForCast = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_recast_timeout':
-            backend.recastTimeout = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_recast_timeout':
+            MacroSystemInstance.MaximumWaitTimeBeforeRecast = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_fish_end_delay':
-            backend.fishEndDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_fish_end_delay':
+            MacroSystemInstance.DelayAfterFishCaptured = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_state_resend':
-            backend.stateResendInterval = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_state_resend':
+            MacroSystemInstance.InputStateResendFrequency = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_loops_per_purchase':
-            backend.loopsPerPurchase = int(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_loops_per_purchase':
+            MacroSystemInstance.BaitPurchaseFrequencyCounter = int(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_focus_delay':
-            backend.robloxFocusDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_focus_delay':
+            MacroSystemInstance.RobloxWindowFocusInitialDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_post_focus_delay':
-            backend.robloxPostFocusDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_post_focus_delay':
+            MacroSystemInstance.RobloxWindowFocusFollowupDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_precast_e_delay':
-            backend.preCastEDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_precast_e_delay':
+            MacroSystemInstance.PreCastDialogOpenDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success"})
+    
+        elif RequestedAction == 'set_precast_click_delay':
+            MacroSystemInstance.PreCastMouseClickDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_precast_click_delay':
-            backend.preCastClickDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_precast_type_delay':
+            MacroSystemInstance.PreCastKeyboardInputDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_precast_type_delay':
-            backend.preCastTypeDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_anti_detect_delay':
+            MacroSystemInstance.PreCastAntiDetectionDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_anti_detect_delay':
-            backend.preCastAntiDetectDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_fruit_hotkey_delay':
+            MacroSystemInstance.FruitStorageHotkeyActivationDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_fruit_hotkey_delay':
-            backend.storeFruitHotkeyDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_fruit_click_delay':
+            MacroSystemInstance.FruitStorageClickConfirmationDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_fruit_click_delay':
-            backend.storeFruitClickDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_fruit_shift_delay':
+            MacroSystemInstance.FruitStorageShiftKeyPressDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_fruit_shift_delay':
-            backend.storeFruitShiftDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_fruit_backspace_delay':
+            MacroSystemInstance.FruitStorageBackspaceDeletionDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_fruit_backspace_delay':
-            backend.storeFruitBackspaceDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_rod_delay':
+            MacroSystemInstance.InventorySlotSwitchingDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_rod_delay':
-            backend.rodSelectDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_bait_delay':
+            MacroSystemInstance.BaitSelectionConfirmationDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_bait_delay':
-            backend.autoSelectBaitDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_cursor_delay':
+            MacroSystemInstance.MouseMovementAntiDetectionDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_cursor_delay':
-            backend.cursorAntiDetectDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_scan_delay':
+            MacroSystemInstance.ImageProcessingLoopDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_scan_delay':
-            backend.scanLoopDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_black_threshold':
+            MacroSystemInstance.BlackScreenDetectionRatioThreshold = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
-        elif action == 'set_black_threshold':
-            backend.blackScreenThreshold = float(payload)
-            backend.saveSettings()
-            return jsonify({"status": "success"})
-        
-        elif action == 'set_spam_delay':
-            backend.antiMacroSpamDelay = float(payload)
-            backend.saveSettings()
+        elif RequestedAction == 'set_spam_delay':
+            MacroSystemInstance.AntiMacroDialogSpamDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         
         else:
-            return jsonify({"status": "error", "message": f"Unknown action: {action}"}), 400
-    
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+            return jsonify({"status": "error", "message": f"Unknown action: {RequestedAction}"}), 400
 
-@app.route('/health', methods=['GET'])
-def health_check():
+    except Exception as ErrorDetails:
+        return jsonify({"status": "error", "message": str(ErrorDetails)}), 500
+
+@FlaskApplication.route('/health', methods=['GET'])
+def PerformHealthCheck():
     return jsonify({"status": "ok", "message": "Backend running"})
 
-def run_flask():
-    app.run(host='0.0.0.0', port=8765, debug=False, use_reloader=False)
-
+def ExecuteFlaskServer():
+    FlaskApplication.run(host='0.0.0.0', port=8765, debug=False, use_reloader=False)
+    
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-        
+    FlaskServerThread = threading.Thread(target=ExecuteFlaskServer, daemon=True)
+    FlaskServerThread.start()
     try:
         while True:
             time.sleep(1)
