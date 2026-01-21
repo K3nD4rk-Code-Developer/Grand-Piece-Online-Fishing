@@ -725,6 +725,68 @@
 
         <div class="section">
           <label class="checkbox-row">
+            <input type="checkbox" class="checkbox" id="autoCraftBait"
+              onchange="toggleSection('autoCraftSection', 'autoCraftBait'); sendToPython('toggle_auto_craft', this.checked.toString())">
+            <span class="checkbox-label">Auto Craft Bait</span>
+          </label>
+        
+          <div class="collapsible" id="autoCraftSection" style="display: none;">
+            <div class="row">
+              <span class="label">Craft Left Point:</span>
+              <span class="point-status unset" id="craftLeftPointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_craft_left_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Craft Middle Point:</span>
+              <span class="point-status unset" id="craftMiddlePointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_craft_middle_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Bait Recipe Point:</span>
+              <span class="point-status unset" id="baitRecipePointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_bait_recipe_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Add Recipe Point:</span>
+              <span class="point-status unset" id="addRecipePointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_add_recipe_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Top Recipe Point:</span>
+              <span class="point-status unset" id="topRecipePointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_top_recipe_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Craft Button Point:</span>
+              <span class="point-status unset" id="craftButtonPointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_craft_button_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Close Menu Point:</span>
+              <span class="point-status unset" id="closeMenuPointStatus">Not Set</span>
+              <button class="btn small" onclick="sendToPython('set_close_menu_point', '')">Set</button>
+            </div>
+            <div class="row">
+              <span class="label">Crafts Per Cycle:</span>
+              <input type="number" class="input-field" id="craftsPerCycle" value="80" step="1"
+                onchange="sendToPython('set_crafts_per_cycle', this.value)">
+            </div>
+            <div class="row">
+              <span class="label">Loops Per Craft:</span>
+              <input type="number" class="input-field" id="loopsPerCraft" value="40" step="1"
+                onchange="sendToPython('set_loops_per_craft', this.value)">
+            </div>
+            <div class="row">
+              <span class="label">Move Duration:</span>
+              <input type="number" class="input-field" id="moveDuration" value="4.25" step="0.25"
+                onchange="sendToPython('set_move_duration', this.value)">
+              <span style="color: #6b7280; font-size: 12px;">s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <label class="checkbox-row">
             <input type="checkbox" class="checkbox" id="autoStoreFruit"
               onchange="toggleSection('autoStoreSection', 'autoStoreFruit'); sendToPython('toggle_auto_store', this.checked.toString())">
             <span class="checkbox-label">Auto Store Devil Fruit</span>
@@ -881,7 +943,6 @@
   </div>
 
   <script>
-    // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -892,7 +953,6 @@
       });
     });
 
-    // Toggle collapsible sections
     function toggleSection(sectionId, checkboxId) {
       const section = document.getElementById(sectionId);
       const checkbox = document.getElementById(checkboxId);
@@ -902,7 +962,6 @@
       }, 10);
     }
 
-    // Send commands to Python backend
     async function sendToPython(action, payload) {
       try {
         console.log('Sending to Python:', action, payload);
@@ -917,7 +976,6 @@
       }
     }
 
-    // Update UI from Python events
     function updateStatus(isRunning) {
       const indicator = document.getElementById('statusIndicator');
       const text = document.getElementById('statusText');
@@ -949,7 +1007,6 @@
     }
 
     function updateStats(fishCaught, timeElapsed, fishPerHour) {
-      // Stats display removed from this version, but keeping function for compatibility
     }
 
     function updateSetting(settingName, value) {
@@ -958,9 +1015,11 @@
         if (element.type === 'checkbox') {
           element.checked = value;
 
-          // Update collapsible sections
           if (settingName === 'autoBuyBait') {
             document.getElementById('autoBuySection').style.display = value ? 'block' : 'none';
+          }
+          if (settingName === 'autoCraftBait') {
+            document.getElementById('autoCraftSection').style.display = value ? 'block' : 'none';
           }
           if (settingName === 'autoStoreFruit') {
             document.getElementById('autoStoreSection').style.display = value ? 'block' : 'none';
@@ -974,28 +1033,23 @@
       }
     }
 
-    // Load all settings from backend state
     function loadAllSettings(state) {
-      // Hotkeys
       if (state.hotkeys) {
         updateHotkey('start', state.hotkeys.start_stop || 'f1');
         updateHotkey('area', state.hotkeys.change_area || 'f2');
         updateHotkey('exit', state.hotkeys.exit || 'f3');
       }
 
-      // Number hotkeys
       updateSetting('rodHotkey', state.rodHotkey || '1');
       updateSetting('anythingElseHotkey', state.anythingElseHotkey || '2');
       updateSetting('devilFruitHotkey', state.devilFruitHotkey || '3');
 
-      // Checkboxes
       updateSetting('alwaysOnTop', state.alwaysOnTop || false);
       updateSetting('debugOverlay', state.showDebugOverlay || false);
       updateSetting('autoBuyBait', state.autoBuyCommonBait || false);
       updateSetting('autoStoreFruit', state.autoStoreDevilFruit || false);
       updateSetting('autoSelectBait', state.autoSelectTopBait || false);
 
-      // PD Parameters
       updateSetting('kp', state.kp || 0.9);
       updateSetting('kd', state.kd || 0.3);
       updateSetting('pdClamp', state.pdClamp || 1.0);
@@ -1003,14 +1057,12 @@
       updateSetting('pdChasing', state.pdChasingDamping || 0.5);
       updateSetting('gapTolerance', state.gapToleranceMultiplier || 2.0);
 
-      // Timing
       updateSetting('castHold', state.castHoldDuration || 1.0);
       updateSetting('recastTimeout', state.recastTimeout || 30.0);
       updateSetting('fishEndDelay', state.fishEndDelay || 2.0);
       updateSetting('stateResend', state.stateResendInterval || 0.5);
       updateSetting('loopsPerPurchase', state.loopsPerPurchase || 100);
 
-      // Advanced timing
       updateSetting('focusDelay', state.robloxFocusDelay || 0.2);
       updateSetting('postFocusDelay', state.robloxPostFocusDelay || 1.0);
       updateSetting('preCastE', state.preCastEDelay || 3.0);
@@ -1028,7 +1080,11 @@
       updateSetting('blackThreshold', state.blackScreenThreshold || 0.5);
       updateSetting('spamDelay', state.antiMacroSpamDelay || 0.25);
 
-      // Points
+      updateSetting('autoCraftBait', state.autoCraftBait || false);
+      updateSetting('craftsPerCycle', state.craftsPerCycle || 80);
+      updateSetting('loopsPerCraft', state.loopsPerCraft || 40);
+      updateSetting('moveDuration', state.moveDuration || 4.25);
+
       if (state.waterPoint) {
         updatePointStatus('waterPoint', state.waterPoint.x, state.waterPoint.y);
       }
@@ -1047,18 +1103,36 @@
       if (state.baitPoint) {
         updatePointStatus('baitPoint', state.baitPoint.x, state.baitPoint.y);
       }
+      if (state.craftLeftPoint) {
+        updatePointStatus('craftLeftPoint', state.craftLeftPoint.x, state.craftLeftPoint.y);
+      }
+      if (state.craftMiddlePoint) {
+        updatePointStatus('craftMiddlePoint', state.craftMiddlePoint.x, state.craftMiddlePoint.y);
+      }
+      if (state.baitRecipePoint) {
+        updatePointStatus('baitRecipePoint', state.baitRecipePoint.x, state.baitRecipePoint.y);
+      }
+      if (state.addRecipePoint) {
+        updatePointStatus('addRecipePoint', state.addRecipePoint.x, state.addRecipePoint.y);
+      }
+      if (state.topRecipePoint) {
+        updatePointStatus('topRecipePoint', state.topRecipePoint.x, state.topRecipePoint.y);
+      }
+      if (state.craftButtonPoint) {
+        updatePointStatus('craftButtonPoint', state.craftButtonPoint.x, state.craftButtonPoint.y);
+      }
+      if (state.closeMenuPoint) {
+        updatePointStatus('closeMenuPoint', state.closeMenuPoint.x, state.closeMenuPoint.y);
+      }
     }
 
-    // Poll Python for state updates
     async function pollPythonState() {
       try {
         const response = await fetch('http://localhost:8765/state');
         const state = await response.json();
 
-        // Update running status
         updateStatus(state.isRunning);
 
-        // Update points
         if (state.waterPoint) {
           updatePointStatus('waterPoint', state.waterPoint.x, state.waterPoint.y);
         }
@@ -1077,38 +1151,55 @@
         if (state.baitPoint) {
           updatePointStatus('baitPoint', state.baitPoint.x, state.baitPoint.y);
         }
+        if (state.craftLeftPoint) {
+          updatePointStatus('craftLeftPoint', state.craftLeftPoint.x, state.craftLeftPoint.y);
+        }
+        if (state.craftMiddlePoint) {
+          updatePointStatus('craftMiddlePoint', state.craftMiddlePoint.x, state.craftMiddlePoint.y);
+        }
+        if (state.baitRecipePoint) {
+          updatePointStatus('baitRecipePoint', state.baitRecipePoint.x, state.baitRecipePoint.y);
+        }
+        if (state.addRecipePoint) {
+          updatePointStatus('addRecipePoint', state.addRecipePoint.x, state.addRecipePoint.y);
+        }
+        if (state.topRecipePoint) {
+          updatePointStatus('topRecipePoint', state.topRecipePoint.x, state.topRecipePoint.y);
+        }
+        if (state.craftButtonPoint) {
+          updatePointStatus('craftButtonPoint', state.craftButtonPoint.x, state.craftButtonPoint.y);
+        }
+        if (state.closeMenuPoint) {
+          updatePointStatus('closeMenuPoint', state.closeMenuPoint.x, state.closeMenuPoint.y);
+        }
 
       } catch (error) {
         console.error('Failed to poll state:', error);
       }
     }
 
-    // Initial load - fetch settings once on startup
     async function loadInitialSettings() {
       try {
         const response = await fetch('http://localhost:8765/state');
         const state = await response.json();
         loadAllSettings(state);
-        console.log('✓ Settings loaded successfully');
+        console.log('Settings loaded successfully');
       } catch (error) {
         console.error('Failed to load initial settings:', error);
       }
     }
 
-    // Start polling for stats every 500ms
     let pollInterval;
     function startPolling() {
       if (pollInterval) clearInterval(pollInterval);
       pollInterval = setInterval(pollPythonState, 500);
     }
 
-    // Load settings on page load
     window.addEventListener('DOMContentLoaded', () => {
       loadInitialSettings();
       startPolling();
     });
 
-    // Expose functions globally
     window.updateStatus = updateStatus;
     window.updateHotkey = updateHotkey;
     window.updatePointStatus = updatePointStatus;

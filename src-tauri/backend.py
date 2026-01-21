@@ -33,7 +33,7 @@ class RegionSelectionWindow:
         self.CompletionCallback = CompletionCallback
         self.ParentWindow = ParentWindow
         self.IsWindowClosed = False
-        
+
         self.RootWindow = tk.Tk()
         self.RootWindow.attributes('-alpha', 0.6)
         self.RootWindow.attributes('-topmost', True)
@@ -255,6 +255,20 @@ class AutomatedFishingSystem:
         self.MouseEventListenerInstance = None
         self.CurrentlySettingPointName = None
 
+        self.AutomaticBaitCraftingEnabled = False
+        self.CraftLeftButtonLocation = None
+        self.CraftMiddleButtonLocation = None
+        self.CraftRightButtonLocation = None
+        self.BaitRecipeButtonLocation = None
+        self.AddRecipeButtonLocation = None
+        self.TopRecipeButtonLocation = None
+        self.CraftButtonLocation = None
+        self.CloseMenuButtonLocation = None
+        self.CraftsPerCycleCount = 80
+        self.BaitCraftFrequencyCounter = 40
+        self.MoveDurationSeconds = 4.25
+        self.BaitCraftIterationCounter = 0
+
         self.LoadConfigurationFromDisk()
         self.RegisterAllHotkeyBindings()
     
@@ -319,6 +333,19 @@ class AutomatedFishingSystem:
                     self.PDControllerChasingStateDamping = ParsedConfigurationData.get("pd_chasing_damping", 0.5)
                     self.BarGroupingGapToleranceMultiplier = ParsedConfigurationData.get("gap_tolerance_multiplier", 2.0)
                     self.InputStateResendFrequency = ParsedConfigurationData.get("state_resend_interval", 0.5)
+
+                    self.AutomaticBaitCraftingEnabled = ParsedConfigurationData.get("auto_craft_bait", False)
+                    self.CraftLeftButtonLocation = ParsedConfigurationData.get("craft_left_point", None)
+                    self.CraftMiddleButtonLocation = ParsedConfigurationData.get("craft_middle_point", None)
+                    self.CraftRightButtonLocation = ParsedConfigurationData.get("craft_right_point", None)
+                    self.BaitRecipeButtonLocation = ParsedConfigurationData.get("bait_recipe_point", None)
+                    self.AddRecipeButtonLocation = ParsedConfigurationData.get("add_recipe_point", None)
+                    self.TopRecipeButtonLocation = ParsedConfigurationData.get("top_recipe_point", None)
+                    self.CraftButtonLocation = ParsedConfigurationData.get("craft_button_point", None)
+                    self.CloseMenuButtonLocation = ParsedConfigurationData.get("close_menu_point", None)
+                    self.CraftsPerCycleCount = ParsedConfigurationData.get("crafts_per_cycle", 80)
+                    self.BaitCraftFrequencyCounter = ParsedConfigurationData.get("loops_per_craft", 40)
+                    self.MoveDurationSeconds = ParsedConfigurationData.get("move_duration", 4.25)
             except Exception as LoadError:
                 import traceback
                 traceback.print_exc()
@@ -354,7 +381,19 @@ class AutomatedFishingSystem:
                     "pd_approaching_damping": self.PDControllerApproachingStateDamping,
                     "pd_chasing_damping": self.PDControllerChasingStateDamping,
                     "gap_tolerance_multiplier": self.BarGroupingGapToleranceMultiplier,
-                    "state_resend_interval": self.InputStateResendFrequency
+                    "state_resend_interval": self.InputStateResendFrequency,
+                    "auto_craft_bait": self.AutomaticBaitCraftingEnabled,
+                    "craft_left_point": self.CraftLeftButtonLocation,
+                    "craft_middle_point": self.CraftMiddleButtonLocation,
+                    "craft_right_point": self.CraftRightButtonLocation,
+                    "bait_recipe_point": self.BaitRecipeButtonLocation,
+                    "add_recipe_point": self.AddRecipeButtonLocation,
+                    "top_recipe_point": self.TopRecipeButtonLocation,
+                    "craft_button_point": self.CraftButtonLocation,
+                    "close_menu_point": self.CloseMenuButtonLocation,
+                    "crafts_per_cycle": self.CraftsPerCycleCount,
+                    "loops_per_craft": self.BaitCraftFrequencyCounter,
+                    "move_duration": self.MoveDurationSeconds,
                 }, ConfigurationFileHandle, indent=4)
         except Exception as SaveError:
             print(f"Error saving settings: {SaveError}")
@@ -487,6 +526,117 @@ class AutomatedFishingSystem:
 
         if not self.MacroCurrentlyExecuting:
             return False
+        
+        if self.AutomaticBaitCraftingEnabled and all([
+            self.CraftLeftButtonLocation,
+            self.CraftMiddleButtonLocation,
+            self.CraftRightButtonLocation,
+            self.BaitRecipeButtonLocation,
+            self.AddRecipeButtonLocation,
+            self.TopRecipeButtonLocation,
+            self.CraftButtonLocation,
+            self.CloseMenuButtonLocation
+        ]):
+            if self.BaitCraftIterationCounter == 0 or self.BaitCraftIterationCounter >= self.BaitCraftFrequencyCounter:
+                keyboard.press_and_release('shift')
+                time.sleep(0.1)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                keyboard.press('d')
+                time.sleep(self.MoveDurationSeconds)
+                keyboard.release('d')
+                time.sleep(1.0)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                keyboard.press_and_release('shift')
+                time.sleep(0.1)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                keyboard.press_and_release('t')
+                time.sleep(self.PreCastMouseClickDelay + 0.85)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                ctypes.windll.user32.SetCursorPos(self.CraftLeftButtonLocation['x'], self.CraftLeftButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
+                ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                time.sleep(self.PreCastAntiDetectionDelay)
+                pyautogui.click()
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                ctypes.windll.user32.SetCursorPos(self.CraftMiddleButtonLocation['x'], self.CraftMiddleButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
+                ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                time.sleep(self.PreCastAntiDetectionDelay)
+                pyautogui.click()
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                ctypes.windll.user32.SetCursorPos(self.BaitRecipeButtonLocation['x'], self.BaitRecipeButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
+                ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                time.sleep(self.PreCastAntiDetectionDelay)
+                pyautogui.click()
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                for fish_iteration in range(self.BaitCraftFrequencyCounter):
+                    if not self.MacroCurrentlyExecuting: return False
+                    
+                    ctypes.windll.user32.SetCursorPos(self.AddRecipeButtonLocation['x'], self.AddRecipeButtonLocation['y'])
+                    time.sleep(self.PreCastAntiDetectionDelay)
+                    ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                    time.sleep(self.PreCastAntiDetectionDelay)
+                    pyautogui.click()
+                    time.sleep(self.PreCastMouseClickDelay)
+                    if not self.MacroCurrentlyExecuting: return False
+                    
+                    ctypes.windll.user32.SetCursorPos(self.TopRecipeButtonLocation['x'], self.TopRecipeButtonLocation['y'])
+                    time.sleep(self.PreCastAntiDetectionDelay)
+                    ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                    time.sleep(self.PreCastAntiDetectionDelay)
+                    pyautogui.click()
+                    time.sleep(self.PreCastMouseClickDelay)
+                    if not self.MacroCurrentlyExecuting: return False
+                    
+                    for craft_iteration in range(self.CraftsPerCycleCount):
+                        if not self.MacroCurrentlyExecuting: return False
+                        
+                        ctypes.windll.user32.SetCursorPos(self.CraftButtonLocation['x'], self.CraftButtonLocation['y'])
+                        time.sleep(self.PreCastAntiDetectionDelay)
+                        ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                        time.sleep(self.PreCastAntiDetectionDelay)
+                        pyautogui.click()
+                        time.sleep(self.PreCastMouseClickDelay)
+                
+                ctypes.windll.user32.SetCursorPos(self.CloseMenuButtonLocation['x'], self.CloseMenuButtonLocation['y'])
+                time.sleep(self.PreCastAntiDetectionDelay)
+                ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
+                time.sleep(self.PreCastAntiDetectionDelay)
+                pyautogui.click()
+                time.sleep(self.PreCastMouseClickDelay)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                # Press left shift before returning
+                keyboard.press_and_release('shift')
+                time.sleep(0.1)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                # Hold A to return to original position
+                keyboard.press('a')
+                time.sleep(self.MoveDurationSeconds)
+                keyboard.release('a')
+                time.sleep(1.0)  # Wait 1 second after returning
+                if not self.MacroCurrentlyExecuting: return False
+                
+                # Press left shift after returning
+                keyboard.press_and_release('shift')
+                time.sleep(0.1)
+                if not self.MacroCurrentlyExecuting: return False
+                
+                self.BaitCraftIterationCounter = 1
+            else:
+                self.BaitCraftIterationCounter += 1
         
         if self.AutomaticBaitPurchaseEnabled and self.ShopLeftButtonLocation and self.ShopCenterButtonLocation and self.ShopRightButtonLocation:
             if self.BaitPurchaseIterationCounter == 0 or self.BaitPurchaseIterationCounter >= self.BaitPurchaseFrequencyCounter:                
@@ -745,6 +895,10 @@ class AutomatedFishingSystem:
                     (BoundedSliceArray[:, 0, 0] == IndicatorWhiteColor[2]))
         
         if not np.any(WhitePixelMask):
+            if not self.MouseButtonCurrentlyPressed:
+                pyautogui.mouseDown()
+                print("No White Indicator Detected - Mouse Button")
+                
             return True
         
         WhitePixelYCoordinates = np.where(WhitePixelMask)[0]
@@ -760,9 +914,10 @@ class AutomatedFishingSystem:
                     (BoundedSliceArray[:, 0, 0] == TargetDarkGrayColor[2]))
         
         if not np.any(DarkGrayPixelMask):
-            if self.MouseButtonCurrentlyPressed:
-                pyautogui.mouseUp()
-                self.MouseButtonCurrentlyPressed = False
+            if not self.MouseButtonCurrentlyPressed:
+                pyautogui.mouseDown()
+                print("Panic Click Engaged - No Dark Gray Pixels Detected")
+                self.MouseButtonCurrentlyPressed = True
                 
             return True
         
@@ -900,7 +1055,18 @@ class AutomatedFishingSystem:
             "antiMacroSpamDelay": self.AntiMacroDialogSpamDelay,
             "rodSelectDelay": self.InventorySlotSwitchingDelay,
             "cursorAntiDetectDelay": self.MouseMovementAntiDetectionDelay,
-            "scanLoopDelay": self.ImageProcessingLoopDelay
+            "scanLoopDelay": self.ImageProcessingLoopDelay,
+            "autoCraftBait": self.AutomaticBaitCraftingEnabled,
+            "craftLeftPoint": self.CraftLeftButtonLocation,
+            "craftMiddlePoint": self.CraftMiddleButtonLocation,
+            "baitRecipePoint": self.BaitRecipeButtonLocation,
+            "addRecipePoint": self.AddRecipeButtonLocation,
+            "topRecipePoint": self.TopRecipeButtonLocation,
+            "craftButtonPoint": self.CraftButtonLocation,
+            "closeMenuPoint": self.CloseMenuButtonLocation,
+            "craftsPerCycle": self.CraftsPerCycleCount,
+            "loopsPerCraft": self.BaitCraftFrequencyCounter,
+            "moveDuration": self.MoveDurationSeconds,
         }
 
 MacroSystemInstance = AutomatedFishingSystem()
@@ -1140,6 +1306,58 @@ def ProcessIncomingCommand():
         
         elif RequestedAction == 'set_spam_delay':
             MacroSystemInstance.AntiMacroDialogSpamDelay = float(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success"})
+        
+        elif RequestedAction == 'set_craft_left_point':
+            MacroSystemInstance.InitiatePointSelectionMode('CraftLeftButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_craft_middle_point':
+            MacroSystemInstance.InitiatePointSelectionMode('CraftMiddleButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_craft_right_point':
+            MacroSystemInstance.InitiatePointSelectionMode('CraftRightButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_bait_recipe_point':
+            MacroSystemInstance.InitiatePointSelectionMode('BaitRecipeButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_add_recipe_point':
+            MacroSystemInstance.InitiatePointSelectionMode('AddRecipeButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_top_recipe_point':
+            MacroSystemInstance.InitiatePointSelectionMode('TopRecipeButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_craft_button_point':
+            MacroSystemInstance.InitiatePointSelectionMode('CraftButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'set_close_menu_point':
+            MacroSystemInstance.InitiatePointSelectionMode('CloseMenuButtonLocation')
+            return jsonify({"status": "waiting_for_click"})
+
+        elif RequestedAction == 'toggle_auto_craft':
+            MacroSystemInstance.AutomaticBaitCraftingEnabled = ActionPayload.lower() == 'true'
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success", "value": MacroSystemInstance.AutomaticBaitCraftingEnabled})
+
+        elif RequestedAction == 'set_crafts_per_cycle':
+            MacroSystemInstance.CraftsPerCycleCount = int(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success"})
+
+        elif RequestedAction == 'set_loops_per_craft':
+            MacroSystemInstance.BaitCraftFrequencyCounter = int(ActionPayload)
+            MacroSystemInstance.SaveConfigurationToDisk()
+            return jsonify({"status": "success"})
+
+        elif RequestedAction == 'set_move_duration':
+            MacroSystemInstance.MoveDurationSeconds = float(ActionPayload)
             MacroSystemInstance.SaveConfigurationToDisk()
             return jsonify({"status": "success"})
         

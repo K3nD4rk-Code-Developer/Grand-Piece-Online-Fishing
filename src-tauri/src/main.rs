@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{Manager, PhysicalPosition};
-use std::process::{Command, Child};
+use std::process::{Command, Child, Stdio};
 use std::sync::Mutex;
+use std::path::PathBuf;
 
 struct PythonProcess(Mutex<Option<Child>>);
 
@@ -22,24 +23,57 @@ fn send_to_python(action: String, payload: String) -> Result<String, String> {
     }
 }
 
+fn get_backend_path(app: &tauri::AppHandle) -> PathBuf {
+    // In development, use the Python script
+    #[cfg(debug_assertions)]
+    {
+        return PathBuf::from("backend.py");
+    }
+    
+    // In production, use the bundled executable
+    #[cfg(not(debug_assertions))]
+    {
+        let resource_path = app.path().resource_dir()
+            .expect("Failed to get resource directory");
+        return resource_path.join("dist").join("backend.exe");
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            #[cfg(target_os = "windows")]
-            let python_cmd = "python";
+            let backend_path = get_backend_path(&app.handle());
             
-            #[cfg(not(target_os = "windows"))]
-            let python_cmd = "python3";
-            
-            let python_process = Command::new(python_cmd)
-                .arg("backend.py")
-                .spawn()
-                .expect("Failed to start Python backend");
+            let python_process = if cfg!(debug_assertions) {
+                // Development: run Python script
+                #[cfg(target_os = "windows")]
+                let python_cmd = "python";
+                
+                #[cfg(not(target_os = "windows"))]
+                let python_cmd = "python3";
+                
+                Command::new(python_cmd)
+                    .arg(backend_path)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("Failed to start Python backend")
+            } else {
+                // Production: run bundled executable
+                Command::new(backend_path)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("Failed to start backend executable")
+            };
             
             app.manage(PythonProcess(Mutex::new(Some(python_process))));
             
             let main_window = app.get_webview_window("main").unwrap();
             let stats_window = app.get_webview_window("stats");
+            
+            // Wait for backend to start
+            std::thread::sleep(std::time::Duration::from_secs(2));
             
             let main_window_clone = main_window.clone();
             std::thread::spawn(move || {
@@ -71,7 +105,6 @@ fn main() {
                                 let show_debug = state.get("showDebugOverlay").and_then(|v| v.as_bool()).unwrap_or(false);
                                 
                                 if is_running && show_debug {
-                                    // Center at top of screen
                                     if let Ok(monitor) = stats_win.current_monitor() {
                                         if let Some(monitor) = monitor {
                                             if let Ok(size) = stats_win.outer_size() {
@@ -96,14 +129,13 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                // Kill Python process when main window is closed
                 if window.label() == "main" {
                     if let Some(python_process) = window.app_handle().try_state::<PythonProcess>() {
                         if let Ok(mut process_guard) = python_process.0.lock() {
                             if let Some(mut child) = process_guard.take() {
                                 let _ = child.kill();
                                 let _ = child.wait();
-                                println!("Python backend terminated");
+                                println!("Backend terminated");
                             }
                         }
                     }
