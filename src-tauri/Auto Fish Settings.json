@@ -5,16 +5,16 @@
         "exit": "f3"
     },
     "area_box": {
-        "x1": 1308,
-        "y1": 475,
-        "x2": 1821,
-        "y2": 1090
+        "x1": 1219,
+        "y1": 489,
+        "x2": 1732,
+        "y2": 1104
     },
     "always_on_top": false,
     "show_debug_overlay": true,
     "water_point": {
-        "x": 1092,
-        "y": 360
+        "x": 1110,
+        "y": 348
     },
     "kp": 1.4,
     "kd": 0.6,
@@ -44,7 +44,7 @@
         "x": 1284,
         "y": 1154
     },
-    "devil_fruit_hotkey": "2",
+    "devil_fruit_hotkey": "6",
     "bait_point": {
         "x": 1281,
         "y": 1066
@@ -54,39 +54,15 @@
     "gap_tolerance_multiplier": 2.0,
     "state_resend_interval": 0.5,
     "auto_craft_bait": false,
-    "craft_left_point": {
-        "x": 1056,
-        "y": 1301
-    },
-    "craft_middle_point": {
-        "x": 1279,
-        "y": 1305
-    },
-    "craft_right_point": {
-        "x": 1563,
-        "y": 1300
-    },
-    "bait_recipe_point": {
-        "x": 1033,
-        "y": 763
-    },
-    "add_recipe_point": {
-        "x": 1480,
-        "y": 492
-    },
-    "top_recipe_point": {
-        "x": 1746,
-        "y": 410
-    },
-    "craft_button_point": {
-        "x": 1485,
-        "y": 1025
-    },
-    "close_menu_point": {
-        "x": 1673,
-        "y": 347
-    },
-    "crafts_per_cycle": 5,
-    "loops_per_craft": 5,
-    "move_duration": 3.75
+    "craft_left_point": null,
+    "craft_middle_point": null,
+    "craft_right_point": null,
+    "bait_recipe_point": null,
+    "add_recipe_point": null,
+    "top_recipe_point": null,
+    "craft_button_point": null,
+    "close_menu_point": null,
+    "crafts_per_cycle": 80,
+    "loops_per_craft": 40,
+    "move_duration": 4.25
 }

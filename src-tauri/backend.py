@@ -312,7 +312,7 @@ class AutomatedFishingSystem:
 
                     self.RobloxWindowFocusInitialDelay = ParsedConfigurationData.get("roblox_focus_delay", 0.2)
                     self.RobloxWindowFocusFollowupDelay = ParsedConfigurationData.get("roblox_post_focus_delay", 0.2)
-                    self.PreCastDialogOpenDelay = ParsedConfigurationData.get("pre_cast_e_delay", 1.25)
+                    self.PreCastDialogOpenDelay = ParsedConfigurationData.get("set_precast_e_delay", 1.25)
                     self.PreCastMouseClickDelay = ParsedConfigurationData.get("pre_cast_click_delay", 0.5)
                     self.PreCastKeyboardInputDelay = ParsedConfigurationData.get("pre_cast_type_delay", 0.25)
                     self.PreCastAntiDetectionDelay = ParsedConfigurationData.get("pre_cast_anti_detect_delay", 0.05)
