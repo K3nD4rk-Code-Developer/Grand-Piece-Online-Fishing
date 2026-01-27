@@ -14,6 +14,8 @@ import win32gui
 import win32con
 import tkinter as tk
 from tkinter import ttk
+import requests
+from datetime import datetime
 
 pyautogui.PAUSE = 0
 
@@ -273,6 +275,9 @@ class AutomatedFishingSystem:
         self.MoveDurationSeconds = 4.25
         self.BaitCraftIterationCounter = 0
 
+        self.WebhookUrl = ""
+        self.LogDevilFruitEnabled = False
+
         self.LoadConfigurationFromDisk()
         self.RegisterAllHotkeyBindings()
     
@@ -353,6 +358,10 @@ class AutomatedFishingSystem:
                     self.CraftsPerCycleCount = ParsedConfigurationData.get("crafts_per_cycle", 80)
                     self.BaitCraftFrequencyCounter = ParsedConfigurationData.get("loops_per_craft", 40)
                     self.MoveDurationSeconds = ParsedConfigurationData.get("move_duration", 4.25)
+
+                    self.WebhookUrl = ParsedConfigurationData.get("webhook_url", "")
+                    self.LogDevilFruitEnabled = ParsedConfigurationData.get("log_devil_fruit", False)
+
             except Exception as LoadError:
                 import traceback
                 traceback.print_exc()
@@ -419,6 +428,8 @@ class AutomatedFishingSystem:
                     "crafts_per_cycle": self.CraftsPerCycleCount,
                     "loops_per_craft": self.BaitCraftFrequencyCounter,
                     "move_duration": self.MoveDurationSeconds,
+                    "webhook_url": self.WebhookUrl,
+                    "log_devil_fruit": self.LogDevilFruitEnabled,
                 }, ConfigurationFileHandle, indent=4)
         except Exception as SaveError:
             print(f"Error saving settings: {SaveError}")
@@ -474,6 +485,48 @@ class AutomatedFishingSystem:
     
     def TerminateApplicationImmediately(self):
         os._exit(0)
+
+    def SendWebhookNotification(self, message, color=0x00d4ff):
+        if not self.WebhookUrl:
+            return
+        
+        try:
+            if "successfully" in message.lower():
+                emoji = "✅"
+                color = 0x00ff00
+            elif "could not" in message.lower() or "failed" in message.lower():
+                emoji = "❌"
+                color = 0xff0000
+            else:
+                emoji = "🎣"
+                color = 0x00d4ff
+            
+            embed = {
+                "title": f"{emoji} GPO Fishing Macro",
+                "description": f"**{message}**",
+                "color": color,
+                "timestamp": datetime.utcnow().isoformat(),
+                "footer": {
+                    "text": "Macro Notification System",
+                    "icon_url": "https://cdn.discordapp.com/avatars/1351127835175288893/208dc6bfcc148a0c3ad2482b12520f43.webp"
+                },
+                "fields": [
+                    {
+                        "name": "🕒 Time",
+                        "value": f"<t:{int(time.time())}:R>",
+                        "inline": True
+                    }
+                ],
+            }
+            
+            payload = {
+                "username": "GPO Macro Bot",
+                "embeds": [embed]
+            }
+            
+            requests.post(self.WebhookUrl, json=payload, timeout=5)
+        except Exception as e:
+            print(f"Webhook error: {e}")
     
     def InitiatePointSelectionMode(self, AttributeNameToSet):
         if self.MouseEventListenerInstance:
@@ -733,6 +786,10 @@ class AutomatedFishingSystem:
                     if not self.MacroCurrentlyExecuting: return False
                     
                     if self.FruitStorageButtonLocation:
+                        initial_green_detected = False
+                        if self.LogDevilFruitEnabled and self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                            initial_green_detected = True
+                            
                         ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
                         time.sleep(self.PreCastAntiDetectionDelay)
                         ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
@@ -773,11 +830,33 @@ class AutomatedFishingSystem:
                         
                         keyboard.press_and_release('`')
                         time.sleep(self.FruitStorageHotkeyActivationDelay)
+                    
+                        if initial_green_detected and self.WebhookUrl:
+                            time.sleep(1.0)
+                            if not self.MacroCurrentlyExecuting: return False
+                            if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                                self.SendWebhookNotification("Devil Fruit stored successfully!")
+                            else:
+                                self.SendWebhookNotification("Devil Fruit could not be stored.")
+                                
                 elif self.FruitStorageButtonLocation:
+                    keyboard.press_and_release(self.AlternateInventorySlot)
+                    time.sleep(self.InventorySlotSwitchingDelay)
+
+                    keyboard.press_and_release(self.FishingRodInventorySlot)
+                    time.sleep(self.InventorySlotSwitchingDelay)
+
+                    keyboard.press_and_release(self.FishingRodInventorySlot)
+                    time.sleep(self.InventorySlotSwitchingDelay)
+
                     keyboard.press_and_release(self.DevilFruitInventorySlot)
                     time.sleep(self.FruitStorageHotkeyActivationDelay)
                     if not self.MacroCurrentlyExecuting: return False
-                    
+
+                    initial_green_detected = False
+                    if self.LogDevilFruitEnabled and self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                        initial_green_detected = True
+                            
                     ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
                     time.sleep(self.PreCastAntiDetectionDelay)
                     ctypes.windll.user32.mouse_event(0x0001, 0, 1, 0, 0)
@@ -786,16 +865,25 @@ class AutomatedFishingSystem:
                     time.sleep(self.FruitStorageClickConfirmationDelay)
                     if not self.MacroCurrentlyExecuting: return False
                     
-                    keyboard.press_and_release('shift')
-                    time.sleep(self.FruitStorageShiftKeyPressDelay)
-                    if not self.MacroCurrentlyExecuting: return False
-                    
-                    keyboard.press_and_release('backspace')
-                    time.sleep(self.FruitStorageBackspaceDeletionDelay)
-                    if not self.MacroCurrentlyExecuting: return False
-                    
-                    keyboard.press_and_release('shift')
+                    if initial_green_detected and self.WebhookUrl:
+                        time.sleep(1.0)
+                        if not self.MacroCurrentlyExecuting: return False
+
+                        if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                            self.SendWebhookNotification("Devil Fruit stored successfully!")
+                        else:
+                            self.SendWebhookNotification("Devil Fruit could not be stored.")
+                            keyboard.press_and_release('shift')
+                            time.sleep(self.FruitStorageShiftKeyPressDelay)
+                            if not self.MacroCurrentlyExecuting: return False
+                            
+                            keyboard.press_and_release('backspace')
+                            time.sleep(self.FruitStorageBackspaceDeletionDelay)
+                            if not self.MacroCurrentlyExecuting: return False
+                            
+                            keyboard.press_and_release('shift')
                 
+                    
                 self.DevilFruitStorageIterationCounter = 1
             else:
                 self.DevilFruitStorageIterationCounter += 1
@@ -910,6 +998,41 @@ class AutomatedFishingSystem:
         BlackPixelRatio = TotalBlackPixelCount / TotalPixelCount
         
         return BlackPixelRatio >= self.BlackScreenDetectionRatioThreshold
+    
+    def DetectGreenishColor(self, TargetPoint, ToleranceRadius=20):
+        if not TargetPoint:
+            return False
+        
+        try:
+            with mss.mss() as ScreenCapture:
+                CaptureRegion = {
+                    "top": TargetPoint['y'] - ToleranceRadius,
+                    "left": TargetPoint['x'] - ToleranceRadius,
+                    "width": ToleranceRadius * 2,
+                    "height": ToleranceRadius * 2
+                }
+                CapturedScreen = ScreenCapture.grab(CaptureRegion)
+                ScreenImageArray = np.array(CapturedScreen)
+            
+            GreenChannel = ScreenImageArray[:, :, 1]
+            RedChannel = ScreenImageArray[:, :, 2]
+            BlueChannel = ScreenImageArray[:, :, 0]
+            
+            GreenishMask = (
+                (GreenChannel > RedChannel + 20) & 
+                (GreenChannel > BlueChannel + 20) &
+                (GreenChannel > 80)
+            )
+            
+            GreenPixelCount = np.sum(GreenishMask)
+            TotalPixels = ScreenImageArray.shape[0] * ScreenImageArray.shape[1]
+            GreenRatio = GreenPixelCount / TotalPixels
+            
+            return GreenRatio > 0.10
+            
+        except Exception as e:
+            print(f"Error detecting green color: {e}")
+            return False
     
     def HandleAntiMacroDetection(self):
         RetryAttemptCount = 0
@@ -1153,6 +1276,8 @@ class AutomatedFishingSystem:
             "craftsPerCycle": self.CraftsPerCycleCount,
             "loopsPerCraft": self.BaitCraftFrequencyCounter,
             "moveDuration": self.MoveDurationSeconds,
+            "webhookUrl": self.WebhookUrl,
+            "logDevilFruit": self.LogDevilFruitEnabled,
         }
 
 MacroSystemInstance = AutomatedFishingSystem()
@@ -1240,6 +1365,8 @@ def ProcessIncomingCommand():
             'set_black_threshold': lambda: handle_float_value('BlackScreenDetectionRatioThreshold'),
             'set_spam_delay': lambda: handle_float_value('AntiMacroDialogSpamDelay'),
             'set_move_duration': lambda: handle_float_value('MoveDurationSeconds'),
+            'set_webhook_url': lambda: handle_string_value('WebhookUrl'),
+            'toggle_log_devil_fruit': lambda: handle_boolean_toggle('LogDevilFruitEnabled'),
         }
         
         if RequestedAction == 'rebind_hotkey':

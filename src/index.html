@@ -549,6 +549,7 @@
         <div class="nav-item active" data-view="controls">Control Center</div>
         <div class="nav-item" data-view="locations">Locations</div>
         <div class="nav-item" data-view="automation">Automation</div>
+        <div class="nav-item" data-view="logging">Logging</div>
         <div class="nav-item" data-view="tuning">Tuning</div>
         <div class="nav-item" data-view="timing">Timing</div>
       </div>
@@ -866,6 +867,33 @@
                   onclick="toggleExpandable('autoSelectBait', 'autoSelectExpand')"></div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="view" id="logging">
+          <div class="card">
+            <div class="card-header">Webhook Configuration</div>
+            <div class="control-group">
+              <span class="control-label">Discord Webhook URL</span>
+              <div class="control-input">
+                <input type="text" class="input input-wide" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..."
+                  onchange="sendToPython('set_webhook_url', this.value)">
+              </div>
+            </div>
+            <div class="help-hint">Paste your Discord webhook URL to receive notifications</div>
+          </div>
+        
+          <div class="card">
+            <div class="card-header">Event Logging</div>
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                <input type="checkbox" id="logDevilFruit" onchange="sendToPython('toggle_log_devil_fruit', this.checked.toString())">
+                <label class="checkbox-label" for="logDevilFruit">
+                  Devil Fruit Stored
+                </label>
+              </div>
+            </div>
+            <div class="help-hint">Select which events to send to your webhook</div>
           </div>
         </div>
 
@@ -1355,6 +1383,9 @@
       updatePointStatus('craftButtonPoint', state.craftButtonPoint?.x, state.craftButtonPoint?.y);
       updatePointStatus('closeMenuPoint', state.closeMenuPoint?.x, state.closeMenuPoint?.y);
       updatePointStatus('devilFruitLocationPoint', state.devilFruitLocationPoint?.x, state.devilFruitLocationPoint?.y);
+
+      setInputValue('webhookUrl', state.webhookUrl || '');
+      document.getElementById('logDevilFruit').checked = state.logDevilFruit || false;
 
       console.log('All settings loaded successfully');
     }

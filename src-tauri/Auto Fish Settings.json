@@ -41,15 +41,15 @@
         "y": 1303
     },
     "store_fruit_point": {
-        "x": 1284,
-        "y": 1154
+        "x": 1376,
+        "y": 1147
     },
     "bait_point": {
         "x": 1281,
         "y": 1066
     },
     "loops_per_purchase": 100,
-    "store_to_backpack": true,
+    "store_to_backpack": false,
     "devil_fruit_location_point": {
         "x": 913,
         "y": 1367
@@ -61,10 +61,10 @@
     "pre_cast_click_delay": 0.5,
     "pre_cast_type_delay": 0.25,
     "pre_cast_anti_detect_delay": 0.05,
-    "store_fruit_hotkey_delay": 1.0,
-    "store_fruit_click_delay": 2.0,
-    "store_fruit_shift_delay": 0.5,
-    "store_fruit_backspace_delay": 1.5,
+    "store_fruit_hotkey_delay": 0.5,
+    "store_fruit_click_delay": 1.0,
+    "store_fruit_shift_delay": 0.2,
+    "store_fruit_backspace_delay": 0.5,
     "auto_select_bait_delay": 0.5,
     "black_screen_threshold": 0.5,
     "anti_macro_spam_delay": 0.25,
@@ -75,7 +75,7 @@
     "pd_chasing_damping": 0.5,
     "gap_tolerance_multiplier": 2.0,
     "state_resend_interval": 0.5,
-    "auto_craft_bait": true,
+    "auto_craft_bait": false,
     "craft_left_point": {
         "x": 1048,
         "y": 1297
@@ -106,5 +106,7 @@
     },
     "crafts_per_cycle": 40,
     "loops_per_craft": 2,
-    "move_duration": 0.0
+    "move_duration": 0.0,
+    "webhook_url": "https://discord.com/api/webhooks/1355302138020106340/HfF7EF56swzYC_i75qPqWxvyqbIVg8FL03FGsZUkghrxe0azLIpfTURa_Synb8zCCGGQ",
+    "log_devil_fruit": true
 }
