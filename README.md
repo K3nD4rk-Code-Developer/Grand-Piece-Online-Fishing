@@ -9,8 +9,9 @@ Automated fishing bot for Grand Piece Online with a clean web UI and PD control.
 ## Features
 
 - **PD Controller** for smooth fishing minigame tracking
-- **Auto-buy bait** - configurable purchase intervals
-- **Auto-store devil fruits**
+- **Auto-craft bait** - configurable purchase intervals
+- **Auto-buy bait** - configurable craft intervals
+- **Auto-store devil fruits** - ability to store to ` backpack instead
 - **Anti-macro detection** - clears black screens automatically
 - **Hybrid-based UI** - no tkinter nonsense
 - **Real-time stats** - fish count, time, fish/hour
