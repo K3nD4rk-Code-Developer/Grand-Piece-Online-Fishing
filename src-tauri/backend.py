@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 import requests
 from datetime import datetime
+from difflib import get_close_matches
 import re
 
 pyautogui.PAUSE = 0
@@ -273,8 +274,8 @@ class AutomatedFishingSystem:
         self.MouseHoldDurationForCast = 0.1
         self.MaximumWaitTimeBeforeRecast = 25.0
         self.DelayAfterFishCaptured = 0.5
-        self.FishingRodInventorySlot = "4"
-        self.AlternateInventorySlot = "1"
+        self.FishingRodInventorySlot = "1"
+        self.AlternateInventorySlot = "2"
         self.AutomaticBaitPurchaseEnabled = True
         self.AutomaticFruitStorageEnabled = False
         self.AutomaticTopBaitSelectionEnabled = False
@@ -297,7 +298,7 @@ class AutomatedFishingSystem:
         self.BaitSelectionButtonLocation = None
 
         self.BaitPurchaseFrequencyCounter = 100
-        self.DevilFruitInventorySlot = "6"
+        self.DevilFruitInventorySlot = "3"
 
         self.RobloxWindowFocusInitialDelay = 0.2
         self.RobloxWindowFocusFollowupDelay = 0.2
@@ -349,6 +350,8 @@ class AutomatedFishingSystem:
         self.CloseMenuButtonLocation = None
         self.CraftsPerCycleCount = 40
         self.BaitCraftFrequencyCounter = 5
+        self.FishCountPerCraft = 50
+        self.FishCountSinceLastCraft = 0
         self.MoveDurationSeconds = 4.25
         self.BaitCraftIterationCounter = 0
 
@@ -364,80 +367,108 @@ class AutomatedFishingSystem:
                 with open(self.ConfigurationFilePath, 'r') as ConfigurationFileHandle:
                     ParsedConfigurationData = json.load(ConfigurationFileHandle)
 
-                    self.GlobalHotkeyBindings.update(ParsedConfigurationData.get("hotkeys", {}))
-                    self.ScanningRegionBounds.update(ParsedConfigurationData.get("area_box", {}))
-
-                    self.WindowAlwaysOnTopEnabled = ParsedConfigurationData.get("always_on_top", True)
-                    self.DebugOverlayVisible = ParsedConfigurationData.get("show_debug_overlay", False)
-
-                    self.WaterCastingTargetLocation = ParsedConfigurationData.get("water_point", None)
-
-                    self.ProportionalGainCoefficient = ParsedConfigurationData.get("kp", 1.4)
-                    self.DerivativeGainCoefficient = ParsedConfigurationData.get("kd", 0.6)
-                    self.ControlSignalMaximumClamp = ParsedConfigurationData.get("pd_clamp", 1.0)
-
-                    self.MouseHoldDurationForCast = ParsedConfigurationData.get("cast_hold_duration", 0.1)
-                    self.MaximumWaitTimeBeforeRecast = ParsedConfigurationData.get("recast_timeout", 25.0)
-                    self.DelayAfterFishCaptured = ParsedConfigurationData.get("fish_end_delay", 0.5)
-
-                    self.FishingRodInventorySlot = ParsedConfigurationData.get("rod_hotkey", "4")
-                    self.AlternateInventorySlot = ParsedConfigurationData.get("anything_else_hotkey", "1")
-                    self.DevilFruitInventorySlot = ParsedConfigurationData.get("devil_fruit_hotkey", "6")
-
-                    self.AutomaticBaitPurchaseEnabled = ParsedConfigurationData.get("auto_buy_common_bait", True)
-                    self.AutomaticFruitStorageEnabled = ParsedConfigurationData.get("auto_store_devil_fruit", False)
-                    self.AutomaticTopBaitSelectionEnabled = ParsedConfigurationData.get("auto_select_top_bait", False)
-
-                    self.ShopLeftButtonLocation = ParsedConfigurationData.get("left_point", None)
-                    self.ShopCenterButtonLocation = ParsedConfigurationData.get("middle_point", None)
-                    self.ShopRightButtonLocation = ParsedConfigurationData.get("right_point", None)
-                    self.FruitStorageButtonLocation = ParsedConfigurationData.get("store_fruit_point", None)
-                    self.BaitSelectionButtonLocation = ParsedConfigurationData.get("bait_point", None)
-
-                    self.BaitPurchaseFrequencyCounter = ParsedConfigurationData.get("loops_per_purchase", 100)
-
-                    self.StoreToBackpackEnabled = ParsedConfigurationData.get("store_to_backpack", False)
-                    self.DevilFruitLocationPoint = ParsedConfigurationData.get("devil_fruit_location_point", None)
-                    self.DevilFruitStorageFrequencyCounter = ParsedConfigurationData.get("loops_per_store", 50)
-
-                    self.RobloxWindowFocusInitialDelay = ParsedConfigurationData.get("roblox_focus_delay", 0.2)
-                    self.RobloxWindowFocusFollowupDelay = ParsedConfigurationData.get("roblox_post_focus_delay", 0.2)
-                    self.PreCastDialogOpenDelay = ParsedConfigurationData.get("set_precast_e_delay", 1.25)
-                    self.PreCastMouseClickDelay = ParsedConfigurationData.get("pre_cast_click_delay", 0.5)
-                    self.PreCastKeyboardInputDelay = ParsedConfigurationData.get("pre_cast_type_delay", 0.25)
-                    self.PreCastAntiDetectionDelay = ParsedConfigurationData.get("pre_cast_anti_detect_delay", 0.05)
-
-                    self.FruitStorageHotkeyActivationDelay = ParsedConfigurationData.get("store_fruit_hotkey_delay", 1.0)
-                    self.FruitStorageClickConfirmationDelay = ParsedConfigurationData.get("store_fruit_click_delay", 2.0)
-                    self.FruitStorageShiftKeyPressDelay = ParsedConfigurationData.get("store_fruit_shift_delay", 0.5)
-                    self.FruitStorageBackspaceDeletionDelay = ParsedConfigurationData.get("store_fruit_backspace_delay", 1.5)
-
-                    self.BaitSelectionConfirmationDelay = ParsedConfigurationData.get("auto_select_bait_delay", 0.5)
-                    self.BlackScreenDetectionRatioThreshold = ParsedConfigurationData.get("black_screen_threshold", 0.5)
-                    self.AntiMacroDialogSpamDelay = ParsedConfigurationData.get("anti_macro_spam_delay", 0.25)
-                    self.InventorySlotSwitchingDelay = ParsedConfigurationData.get("rod_select_delay", 0.2)
-                    self.MouseMovementAntiDetectionDelay = ParsedConfigurationData.get("cursor_anti_detect_delay", 0.05)
-                    self.ImageProcessingLoopDelay = ParsedConfigurationData.get("scan_loop_delay", 0.1)
-
-                    self.PDControllerApproachingStateDamping = ParsedConfigurationData.get("pd_approaching_damping", 2.0)
-                    self.PDControllerChasingStateDamping = ParsedConfigurationData.get("pd_chasing_damping", 0.5)
-                    self.BarGroupingGapToleranceMultiplier = ParsedConfigurationData.get("gap_tolerance_multiplier", 2.0)
-                    self.InputStateResendFrequency = ParsedConfigurationData.get("state_resend_interval", 0.5)
-
-                    self.AutomaticBaitCraftingEnabled = ParsedConfigurationData.get("auto_craft_bait", False)
-                    self.CraftLeftButtonLocation = ParsedConfigurationData.get("craft_left_point", None)
-                    self.CraftMiddleButtonLocation = ParsedConfigurationData.get("craft_middle_point", None)
-                    self.BaitRecipeButtonLocation = ParsedConfigurationData.get("bait_recipe_point", None)
-                    self.AddRecipeButtonLocation = ParsedConfigurationData.get("add_recipe_point", None)
-                    self.TopRecipeButtonLocation = ParsedConfigurationData.get("top_recipe_point", None)
-                    self.CraftButtonLocation = ParsedConfigurationData.get("craft_button_point", None)
-                    self.CloseMenuButtonLocation = ParsedConfigurationData.get("close_menu_point", None)
-                    self.CraftsPerCycleCount = ParsedConfigurationData.get("crafts_per_cycle", 80)
-                    self.BaitCraftFrequencyCounter = ParsedConfigurationData.get("loops_per_craft", 40)
-                    self.MoveDurationSeconds = ParsedConfigurationData.get("move_duration", 4.25)
-
-                    self.WebhookUrl = ParsedConfigurationData.get("webhook_url", "")
-                    self.LogDevilFruitEnabled = ParsedConfigurationData.get("log_devil_fruit", False)
+                    self.GlobalHotkeyBindings.update(ParsedConfigurationData.get("Hotkeys", {}))
+                    
+                    WindowSettings = ParsedConfigurationData.get("WindowSettings", {})
+                    self.WindowAlwaysOnTopEnabled = WindowSettings.get("AlwaysOnTop", True)
+                    self.DebugOverlayVisible = WindowSettings.get("ShowDebugOverlay", False)
+                    
+                    self.ScanningRegionBounds.update(ParsedConfigurationData.get("ScanArea", {}))
+                    
+                    ClickPoints = ParsedConfigurationData.get("ClickPoints", {})
+                    self.WaterCastingTargetLocation = ClickPoints.get("WaterPoint", None)
+                    
+                    ShopPoints = ClickPoints.get("Shop", {})
+                    self.ShopLeftButtonLocation = ShopPoints.get("LeftPoint", None)
+                    self.ShopCenterButtonLocation = ShopPoints.get("MiddlePoint", None)
+                    self.ShopRightButtonLocation = ShopPoints.get("RightPoint", None)
+                    
+                    self.BaitSelectionButtonLocation = ClickPoints.get("BaitPoint", None)
+                    
+                    DevilFruitPoints = ClickPoints.get("DevilFruit", {})
+                    self.FruitStorageButtonLocation = DevilFruitPoints.get("StoreFruitPoint", None)
+                    self.DevilFruitLocationPoint = DevilFruitPoints.get("DevilFruitLocationPoint", None)
+                    
+                    CraftingPoints = ClickPoints.get("Crafting", {})
+                    self.CraftLeftButtonLocation = CraftingPoints.get("CraftLeftPoint", None)
+                    self.CraftMiddleButtonLocation = CraftingPoints.get("CraftMiddlePoint", None)
+                    self.BaitRecipeButtonLocation = CraftingPoints.get("BaitRecipePoint", None)
+                    self.AddRecipeButtonLocation = CraftingPoints.get("AddRecipePoint", None)
+                    self.TopRecipeButtonLocation = CraftingPoints.get("TopRecipePoint", None)
+                    self.CraftButtonLocation = CraftingPoints.get("CraftButtonPoint", None)
+                    self.CloseMenuButtonLocation = CraftingPoints.get("CloseMenuPoint", None)
+                    
+                    InventoryHotkeys = ParsedConfigurationData.get("InventoryHotkeys", {})
+                    self.FishingRodInventorySlot = InventoryHotkeys.get("RodHotkey", "1")
+                    self.AlternateInventorySlot = InventoryHotkeys.get("AnythingElseHotkey", "2")
+                    self.DevilFruitInventorySlot = InventoryHotkeys.get("DevilFruitHotkey", "3")
+                    
+                    Automation = ParsedConfigurationData.get("AutomationFeatures", {})
+                    self.AutomaticBaitPurchaseEnabled = Automation.get("AutoBuyCommonBait", True)
+                    self.AutomaticFruitStorageEnabled = Automation.get("AutoStoreDevilFruit", False)
+                    self.AutomaticTopBaitSelectionEnabled = Automation.get("AutoSelectTopBait", False)
+                    self.AutomaticBaitCraftingEnabled = Automation.get("AutoCraftBait", False)
+                    
+                    Frequencies = ParsedConfigurationData.get("AutomationFrequencies", {})
+                    self.BaitPurchaseFrequencyCounter = Frequencies.get("LoopsPerPurchase", 100)
+                    self.DevilFruitStorageFrequencyCounter = Frequencies.get("LoopsPerStore", 50)
+                    self.BaitCraftFrequencyCounter = Frequencies.get("LoopsPerCraft", 5)
+                    self.CraftsPerCycleCount = Frequencies.get("CraftsPerCycle", 40)
+                    self.FishCountPerCraft = Frequencies.get("FishCountPerCraft", 50)
+                    
+                    DfStorage = ParsedConfigurationData.get("DevilFruitStorage", {})
+                    self.StoreToBackpackEnabled = DfStorage.get("StoreToBackpack", False)
+                    self.LogDevilFruitEnabled = DfStorage.get("LogDevilFruit", False)
+                    self.WebhookUrl = DfStorage.get("WebhookUrl", "")
+                    
+                    FishingControl = ParsedConfigurationData.get("FishingControl", {})
+                    
+                    PdController = FishingControl.get("PdController", {})
+                    self.ProportionalGainCoefficient = PdController.get("Kp", 1.4)
+                    self.DerivativeGainCoefficient = PdController.get("Kd", 0.6)
+                    self.ControlSignalMaximumClamp = PdController.get("PdClamp", 1.0)
+                    self.PDControllerApproachingStateDamping = PdController.get("PdApproachingDamping", 2.0)
+                    self.PDControllerChasingStateDamping = PdController.get("PdChasingDamping", 0.5)
+                    
+                    Timing = FishingControl.get("Timing", {})
+                    self.MouseHoldDurationForCast = Timing.get("CastHoldDuration", 0.1)
+                    self.MaximumWaitTimeBeforeRecast = Timing.get("RecastTimeout", 25.0)
+                    self.DelayAfterFishCaptured = Timing.get("FishEndDelay", 0.5)
+                    self.InputStateResendFrequency = Timing.get("StateResendInterval", 0.5)
+                    
+                    Detection = FishingControl.get("Detection", {})
+                    self.BarGroupingGapToleranceMultiplier = Detection.get("GapToleranceMultiplier", 2.0)
+                    self.BlackScreenDetectionRatioThreshold = Detection.get("BlackScreenThreshold", 0.5)
+                    self.ImageProcessingLoopDelay = Detection.get("ScanLoopDelay", 0.1)
+                    
+                    TimingDelays = ParsedConfigurationData.get("TimingDelays", {})
+                    
+                    RobloxWindow = TimingDelays.get("RobloxWindow", {})
+                    self.RobloxWindowFocusInitialDelay = RobloxWindow.get("RobloxFocusDelay", 0.2)
+                    self.RobloxWindowFocusFollowupDelay = RobloxWindow.get("RobloxPostFocusDelay", 0.2)
+                    
+                    PreCast = TimingDelays.get("PreCast", {})
+                    self.PreCastDialogOpenDelay = PreCast.get("SetPrecastEDelay", 1.25)
+                    self.PreCastMouseClickDelay = PreCast.get("PreCastClickDelay", 0.5)
+                    self.PreCastKeyboardInputDelay = PreCast.get("PreCastTypeDelay", 0.25)
+                    self.PreCastAntiDetectionDelay = PreCast.get("PreCastAntiDetectDelay", 0.05)
+                    
+                    Inventory = TimingDelays.get("Inventory", {})
+                    self.InventorySlotSwitchingDelay = Inventory.get("RodSelectDelay", 0.2)
+                    self.BaitSelectionConfirmationDelay = Inventory.get("AutoSelectBaitDelay", 0.5)
+                    
+                    DfStorageDelays = TimingDelays.get("DevilFruitStorage", {})
+                    self.FruitStorageHotkeyActivationDelay = DfStorageDelays.get("StoreFruitHotkeyDelay", 1.0)
+                    self.FruitStorageClickConfirmationDelay = DfStorageDelays.get("StoreFruitClickDelay", 2.0)
+                    self.FruitStorageShiftKeyPressDelay = DfStorageDelays.get("StoreFruitShiftDelay", 0.5)
+                    self.FruitStorageBackspaceDeletionDelay = DfStorageDelays.get("StoreFruitBackspaceDelay", 1.5)
+                    
+                    AntiDetection = TimingDelays.get("AntiDetection", {})
+                    self.MouseMovementAntiDetectionDelay = AntiDetection.get("CursorAntiDetectDelay", 0.05)
+                    self.AntiMacroDialogSpamDelay = AntiDetection.get("AntiMacroSpamDelay", 0.25)
+                    
+                    CraftingDelays = TimingDelays.get("Crafting", {})
+                    self.MoveDurationSeconds = CraftingDelays.get("MoveDuration", 4.25)
 
             except Exception as LoadError:
                 import traceback
@@ -448,65 +479,106 @@ class AutomatedFishingSystem:
         try:
             with open(self.ConfigurationFilePath, 'w') as ConfigurationFileHandle:
                 json.dump({
-                    "hotkeys": self.GlobalHotkeyBindings,
-                    "area_box": self.ScanningRegionBounds,
-                    "always_on_top": self.WindowAlwaysOnTopEnabled,
-                    "show_debug_overlay": self.DebugOverlayVisible,
-                    "water_point": self.WaterCastingTargetLocation,
-                    "kp": self.ProportionalGainCoefficient,
-                    "kd": self.DerivativeGainCoefficient,
-                    "pd_clamp": self.ControlSignalMaximumClamp,
-                    "cast_hold_duration": self.MouseHoldDurationForCast,
-                    "recast_timeout": self.MaximumWaitTimeBeforeRecast,
-                    "fish_end_delay": self.DelayAfterFishCaptured,
-                    "rod_hotkey": self.FishingRodInventorySlot,
-                    "anything_else_hotkey": self.AlternateInventorySlot,
-                    "devil_fruit_hotkey": self.DevilFruitInventorySlot,
-                    "auto_buy_common_bait": self.AutomaticBaitPurchaseEnabled,
-                    "auto_store_devil_fruit": self.AutomaticFruitStorageEnabled,
-                    "auto_select_top_bait": self.AutomaticTopBaitSelectionEnabled,
-                    "left_point": self.ShopLeftButtonLocation,
-                    "middle_point": self.ShopCenterButtonLocation,
-                    "right_point": self.ShopRightButtonLocation,
-                    "store_fruit_point": self.FruitStorageButtonLocation,
-                    "bait_point": self.BaitSelectionButtonLocation,
-                    "loops_per_purchase": self.BaitPurchaseFrequencyCounter,
-                    "store_to_backpack": self.StoreToBackpackEnabled,
-                    "devil_fruit_location_point": self.DevilFruitLocationPoint,
-                    "loops_per_store": self.DevilFruitStorageFrequencyCounter,
-                    "roblox_focus_delay": self.RobloxWindowFocusInitialDelay,
-                    "roblox_post_focus_delay": self.RobloxWindowFocusFollowupDelay,
-                    "set_precast_e_delay": self.PreCastDialogOpenDelay,
-                    "pre_cast_click_delay": self.PreCastMouseClickDelay,
-                    "pre_cast_type_delay": self.PreCastKeyboardInputDelay,
-                    "pre_cast_anti_detect_delay": self.PreCastAntiDetectionDelay,
-                    "store_fruit_hotkey_delay": self.FruitStorageHotkeyActivationDelay,
-                    "store_fruit_click_delay": self.FruitStorageClickConfirmationDelay,
-                    "store_fruit_shift_delay": self.FruitStorageShiftKeyPressDelay,
-                    "store_fruit_backspace_delay": self.FruitStorageBackspaceDeletionDelay,
-                    "auto_select_bait_delay": self.BaitSelectionConfirmationDelay,
-                    "black_screen_threshold": self.BlackScreenDetectionRatioThreshold,
-                    "anti_macro_spam_delay": self.AntiMacroDialogSpamDelay,
-                    "rod_select_delay": self.InventorySlotSwitchingDelay,
-                    "cursor_anti_detect_delay": self.MouseMovementAntiDetectionDelay,
-                    "scan_loop_delay": self.ImageProcessingLoopDelay,
-                    "pd_approaching_damping": self.PDControllerApproachingStateDamping,
-                    "pd_chasing_damping": self.PDControllerChasingStateDamping,
-                    "gap_tolerance_multiplier": self.BarGroupingGapToleranceMultiplier,
-                    "state_resend_interval": self.InputStateResendFrequency,
-                    "auto_craft_bait": self.AutomaticBaitCraftingEnabled,
-                    "craft_left_point": self.CraftLeftButtonLocation,
-                    "craft_middle_point": self.CraftMiddleButtonLocation,
-                    "bait_recipe_point": self.BaitRecipeButtonLocation,
-                    "add_recipe_point": self.AddRecipeButtonLocation,
-                    "top_recipe_point": self.TopRecipeButtonLocation,
-                    "craft_button_point": self.CraftButtonLocation,
-                    "close_menu_point": self.CloseMenuButtonLocation,
-                    "crafts_per_cycle": self.CraftsPerCycleCount,
-                    "loops_per_craft": self.BaitCraftFrequencyCounter,
-                    "move_duration": self.MoveDurationSeconds,
-                    "webhook_url": self.WebhookUrl,
-                    "log_devil_fruit": self.LogDevilFruitEnabled,
+                    "Hotkeys": self.GlobalHotkeyBindings,
+                    "WindowSettings": {
+                        "AlwaysOnTop": self.WindowAlwaysOnTopEnabled,
+                        "ShowDebugOverlay": self.DebugOverlayVisible
+                    },
+                    "ScanArea": self.ScanningRegionBounds,
+                    "ClickPoints": {
+                        "WaterPoint": self.WaterCastingTargetLocation,
+                        "Shop": {
+                            "LeftPoint": self.ShopLeftButtonLocation,
+                            "MiddlePoint": self.ShopCenterButtonLocation,
+                            "RightPoint": self.ShopRightButtonLocation
+                        },
+                        "BaitPoint": self.BaitSelectionButtonLocation,
+                        "DevilFruit": {
+                            "StoreFruitPoint": self.FruitStorageButtonLocation,
+                            "DevilFruitLocationPoint": self.DevilFruitLocationPoint
+                        },
+                        "Crafting": {
+                            "CraftLeftPoint": self.CraftLeftButtonLocation,
+                            "CraftMiddlePoint": self.CraftMiddleButtonLocation,
+                            "BaitRecipePoint": self.BaitRecipeButtonLocation,
+                            "AddRecipePoint": self.AddRecipeButtonLocation,
+                            "TopRecipePoint": self.TopRecipeButtonLocation,
+                            "CraftButtonPoint": self.CraftButtonLocation,
+                            "CloseMenuPoint": self.CloseMenuButtonLocation
+                        }
+                    },
+                    "InventoryHotkeys": {
+                        "RodHotkey": self.FishingRodInventorySlot,
+                        "AnythingElseHotkey": self.AlternateInventorySlot,
+                        "DevilFruitHotkey": self.DevilFruitInventorySlot
+                    },
+                    "AutomationFeatures": {
+                        "AutoBuyCommonBait": self.AutomaticBaitPurchaseEnabled,
+                        "AutoStoreDevilFruit": self.AutomaticFruitStorageEnabled,
+                        "AutoSelectTopBait": self.AutomaticTopBaitSelectionEnabled,
+                        "AutoCraftBait": self.AutomaticBaitCraftingEnabled
+                    },
+                    "AutomationFrequencies": {
+                        "LoopsPerPurchase": self.BaitPurchaseFrequencyCounter,
+                        "LoopsPerStore": self.DevilFruitStorageFrequencyCounter,
+                        "LoopsPerCraft": self.BaitCraftFrequencyCounter,
+                        "CraftsPerCycle": self.CraftsPerCycleCount,
+                        "FishCountPerCraft": self.FishCountPerCraft
+                    },
+                    "DevilFruitStorage": {
+                        "StoreToBackpack": self.StoreToBackpackEnabled,
+                        "LogDevilFruit": self.LogDevilFruitEnabled,
+                        "WebhookUrl": self.WebhookUrl
+                    },
+                    "FishingControl": {
+                        "PdController": {
+                            "Kp": self.ProportionalGainCoefficient,
+                            "Kd": self.DerivativeGainCoefficient,
+                            "PdClamp": self.ControlSignalMaximumClamp,
+                            "PdApproachingDamping": self.PDControllerApproachingStateDamping,
+                            "PdChasingDamping": self.PDControllerChasingStateDamping
+                        },
+                        "Timing": {
+                            "CastHoldDuration": self.MouseHoldDurationForCast,
+                            "RecastTimeout": self.MaximumWaitTimeBeforeRecast,
+                            "FishEndDelay": self.DelayAfterFishCaptured,
+                            "StateResendInterval": self.InputStateResendFrequency
+                        },
+                        "Detection": {
+                            "GapToleranceMultiplier": self.BarGroupingGapToleranceMultiplier,
+                            "BlackScreenThreshold": self.BlackScreenDetectionRatioThreshold,
+                            "ScanLoopDelay": self.ImageProcessingLoopDelay
+                        }
+                    },
+                    "TimingDelays": {
+                        "RobloxWindow": {
+                            "RobloxFocusDelay": self.RobloxWindowFocusInitialDelay,
+                            "RobloxPostFocusDelay": self.RobloxWindowFocusFollowupDelay
+                        },
+                        "PreCast": {
+                            "SetPrecastEDelay": self.PreCastDialogOpenDelay,
+                            "PreCastClickDelay": self.PreCastMouseClickDelay,
+                            "PreCastTypeDelay": self.PreCastKeyboardInputDelay,
+                            "PreCastAntiDetectDelay": self.PreCastAntiDetectionDelay
+                        },
+                        "Inventory": {
+                            "RodSelectDelay": self.InventorySlotSwitchingDelay,
+                            "AutoSelectBaitDelay": self.BaitSelectionConfirmationDelay
+                        },
+                        "DevilFruitStorage": {
+                            "StoreFruitHotkeyDelay": self.FruitStorageHotkeyActivationDelay,
+                            "StoreFruitClickDelay": self.FruitStorageClickConfirmationDelay,
+                            "StoreFruitShiftDelay": self.FruitStorageShiftKeyPressDelay,
+                            "StoreFruitBackspaceDelay": self.FruitStorageBackspaceDeletionDelay
+                        },
+                        "AntiDetection": {
+                            "CursorAntiDetectDelay": self.MouseMovementAntiDetectionDelay,
+                            "AntiMacroSpamDelay": self.AntiMacroDialogSpamDelay
+                        },
+                        "Crafting": {
+                            "MoveDuration": self.MoveDurationSeconds
+                        }
+                    }
                 }, ConfigurationFileHandle, indent=4)
         except Exception as SaveError:
             print(f"Error saving settings: {SaveError}")
@@ -761,6 +833,7 @@ class AutomatedFishingSystem:
                 
                 if self.MacroCurrentlyExecuting:
                     self.TotalFishSuccessfullyCaught += 1
+                    self.FishCountSinceLastCraft += 1
                     self.MostRecentFishCaptureTimestamp = time.time()
                     
                     RemainingDelayTime = self.DelayAfterFishCaptured
@@ -802,7 +875,8 @@ class AutomatedFishingSystem:
             self.CraftButtonLocation,
             self.CloseMenuButtonLocation
         ]):
-            if self.BaitCraftIterationCounter == 0 or self.BaitCraftIterationCounter >= self.BaitCraftFrequencyCounter:
+            if self.FishCountSinceLastCraft >= self.FishCountPerCraft:
+                time.sleep(1)
                 if self.MoveDurationSeconds < 0:
                     keyboard.press_and_release('shift')
                     time.sleep(0.1)
@@ -898,9 +972,7 @@ class AutomatedFishingSystem:
                     time.sleep(0.1)
                     if not self.MacroCurrentlyExecuting: return False
                 
-                self.BaitCraftIterationCounter = 1
-            else:
-                self.BaitCraftIterationCounter += 1
+                self.FishCountSinceLastCraft = 0
         
         if self.AutomaticBaitPurchaseEnabled and self.ShopLeftButtonLocation and self.ShopCenterButtonLocation and self.ShopRightButtonLocation:
             if self.BaitPurchaseIterationCounter == 0 or self.BaitPurchaseIterationCounter >= self.BaitPurchaseFrequencyCounter:                
@@ -1063,44 +1135,14 @@ class AutomatedFishingSystem:
                         if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
                             def GetClosestFruit(Name, Cutoff=0.6):
                                 KnownFruits = {
-                                    "Soul",
-                                    "Dragon",
-                                    "Mochi",
-                                    "Ope",
-                                    "Tori",
-                                    "Buddha",
-                                    "Pika",
-                                    "Kage",
-                                    "Magu",
-                                    "Gura",
-                                    "Yuki",
-                                    "Smoke",
-                                    "Goru",
-                                    "Suna",
-                                    "Mera",
-                                    "Goro",
-                                    "Ito",
-                                    "Paw",
-                                    "Yami",
-                                    "Zushi",
-                                    "Kira",
-                                    "Spring",
-                                    "Yomi",
-                                    "Bomu",
-                                    "Bari",
-                                    "Mero",
-                                    "Horo",
-                                    "Gomu",
-                                    "Suke",
-                                    "Heal",
-                                    "Kilo",
-                                    "Spin",
-                                    "Hie",
-                                    "Venom",
-                                    "Pteranodon",
+                                    "Soul", "Dragon", "Mochi", "Ope", "Tori", "Buddha",
+                                    "Pika", "Kage", "Magu", "Gura", "Yuki", "Smoke",
+                                    "Goru", "Suna", "Mera", "Goro", "Ito", "Paw",
+                                    "Yami", "Zushi", "Kira", "Spring", "Yomi",
+                                    "Bomu", "Bari", "Mero", "Horo", "Gomu", "Suke", "Heal",
+                                    "Kilo", "Spin", "Hie", "Venom", "Pteranodon",
                                 }
 
-                                from difflib import get_close_matches
                                 Matches = get_close_matches(Name, KnownFruits, n=1, cutoff=Cutoff)
                                 return Matches[0] if Matches else None
 
@@ -1513,6 +1555,7 @@ class AutomatedFishingSystem:
             "closeMenuPoint": self.CloseMenuButtonLocation,
             "craftsPerCycle": self.CraftsPerCycleCount,
             "loopsPerCraft": self.BaitCraftFrequencyCounter,
+            "fishCountPerCraft": self.FishCountPerCraft,
             "moveDuration": self.MoveDurationSeconds,
             "webhookUrl": self.WebhookUrl,
             "logDevilFruit": self.LogDevilFruitEnabled,
@@ -1574,6 +1617,7 @@ def ProcessIncomingCommand():
             'set_devil_fruit_hotkey': lambda: handle_string_value('DevilFruitInventorySlot'),
             'set_loops_per_store': lambda: handle_integer_value('DevilFruitStorageFrequencyCounter'),
             'set_loops_per_purchase': lambda: handle_integer_value('BaitPurchaseFrequencyCounter'),
+            'set_fish_count_per_craft': lambda: handle_integer_value('FishCountPerCraft'),
             'set_crafts_per_cycle': lambda: handle_integer_value('CraftsPerCycleCount'),
             'set_loops_per_craft': lambda: handle_integer_value('BaitCraftFrequencyCounter'),
             'set_kp': lambda: handle_float_value('ProportionalGainCoefficient'),

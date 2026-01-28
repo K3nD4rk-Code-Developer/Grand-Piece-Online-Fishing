@@ -746,24 +746,28 @@
           </div>
 
           <div class="card">
-            <div class="card-header">Additional Locations</div>
+            <div class="card-header">Devil Fruit Locations</div>
             <div class="control-group">
-              <span class="control-label">Devil Fruit Storage</span>
+              <span class="control-label">Devil Fruit Store</span>
               <div class="control-input">
                 <span class="point-indicator unset" id="storeFruitPointStatus">Not Configured</span>
                 <button class="btn btn-sm" onclick="sendToPython('set_store_fruit_point', '')">Configure</button>
               </div>
             </div>
             <div class="control-group">
-              <span class="control-label">Devil Fruit Location</span>
+              <span class="control-label">Devil Fruit Backpack</span>
               <div class="control-input">
                 <span class="point-indicator unset" id="devilFruitLocationPointStatus">Not Configured</span>
                 <button class="btn btn-sm"
                   onclick="sendToPython('set_devil_fruit_location_point', '')">Configure</button>
               </div>
             </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">Bait Locations</div>
             <div class="control-group">
-              <span class="control-label">Bait Selection Point</span>
+              <span class="control-label">Top Bait Point</span>
               <div class="control-input">
                 <span class="point-indicator unset" id="baitPointStatus">Not Configured</span>
                 <button class="btn btn-sm" onclick="sendToPython('set_bait_point', '')">Configure</button>
@@ -804,6 +808,14 @@
               </div>
             </div>
             <div class="expandable-section" id="autoCraftExpand">
+              <div class="control-group">
+                <span class="control-label">Fish Caught Before Craft</span>
+                <div class="control-input">
+                  <input type="number" class="input" id="fishCountPerCraft" value="50" step="1" min="1"
+                    onchange="sendToPython('set_fish_count_per_craft', this.value)">
+                  <span class="unit">fish</span>
+                </div>
+              </div>
               <div class="control-group">
                 <span class="control-label">Amount of Crafts</span>
                 <div class="control-input">
@@ -863,7 +875,7 @@
               <span class="control-label">Enable Auto Select Top Bait</span>
               <div class="control-input">
                 <div class="toggle-switch" id="autoSelectBaitToggle"
-                  onclick="toggleExpandable('autoSelectBait', 'autoSelectExpand')"></div>
+                  onclick="toggleSetting('autoSelectBait')"></div>
               </div>
             </div>
           </div>
@@ -1346,6 +1358,7 @@
       setInputValue('craftsPerCycle', state.craftsPerCycle);
       setInputValue('loopsPerCraft', state.loopsPerCraft);
       setInputValue('moveDuration', state.moveDuration);
+      setInputValue('fishCountPerCraft', state.fishCountPerCraft);
 
       setInputValue('focusDelay', state.robloxFocusDelay);
       setInputValue('postFocusDelay', state.robloxPostFocusDelay);

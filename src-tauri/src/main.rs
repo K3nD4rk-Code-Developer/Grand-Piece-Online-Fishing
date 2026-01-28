@@ -45,7 +45,7 @@ fn get_python_and_script(app: &tauri::AppHandle) -> (PathBuf, PathBuf) {
     {
         let resource_path = app.path().resource_dir()
             .expect("Failed to get resource directory");
-        let python_exe = resource_path.join("python-embed").join("python.exe");
+        let python_exe = resource_path.join("python-embed").join("pythonw.exe");
         let script = resource_path.join("backend.py");
         (python_exe, script)
     }
@@ -230,32 +230,44 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     log_to_file("Main window close requested, terminating backend...");
-                    if let Some(python_process) = window.app_handle().try_state::<PythonProcess>() {
-                        if let Ok(mut process_guard) = python_process.0.lock() {
-                            if let Some(mut child) = process_guard.take() {
-                                #[cfg(target_os = "windows")]
-                                {
-                                    // On Windows, forcefully kill the process tree
-                                    let pid = child.id();
-                                    log_to_file(&format!("Killing Python process PID: {}", pid));
-                                    let _ = Command::new("taskkill")
-                                        .args(&["/F", "/T", "/PID", &pid.to_string()])
-                                        .output();
+                    
+                    // Prevent the window from closing immediately
+                    api.prevent_close();
+                    
+                    let app_handle = window.app_handle().clone();
+                    
+                    // Spawn a thread to handle cleanup
+                    std::thread::spawn(move || {
+                        if let Some(python_process) = app_handle.try_state::<PythonProcess>() {
+                            if let Ok(mut process_guard) = python_process.0.lock() {
+                                if let Some(mut child) = process_guard.take() {
+                                    #[cfg(target_os = "windows")]
+                                    {
+                                        let pid = child.id();
+                                        log_to_file(&format!("Killing Python process PID: {}", pid));
+                                        let _ = Command::new("taskkill")
+                                            .args(&["/F", "/T", "/PID", &pid.to_string()])
+                                            .output();
+                                    }
+                                    
+                                    #[cfg(not(target_os = "windows"))]
+                                    {
+                                        let _ = child.kill();
+                                    }
+                                    
+                                    let _ = child.wait();
+                                    log_to_file("Backend terminated");
                                 }
-                                
-                                #[cfg(not(target_os = "windows"))]
-                                {
-                                    let _ = child.kill();
-                                }
-                                
-                                let _ = child.wait();
-                                log_to_file("Backend terminated");
                             }
                         }
-                    }
+                        
+                        // Now exit the app
+                        log_to_file("Exiting application...");
+                        app_handle.exit(0);
+                    });
                 }
             }
         })
