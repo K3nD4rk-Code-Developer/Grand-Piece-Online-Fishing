@@ -1,14 +1,14 @@
 {
     "hotkeys": {
         "start_stop": "f1",
-        "change_area": "f2",
-        "exit": "f3"
+        "exit": "f3",
+        "change_area": "f2"
     },
     "area_box": {
-        "x1": 1219,
-        "y1": 489,
-        "x2": 1732,
-        "y2": 1104
+        "x1": 1266,
+        "y1": 538,
+        "x2": 1668,
+        "y2": 1044
     },
     "always_on_top": false,
     "show_debug_overlay": true,
@@ -26,7 +26,7 @@
     "anything_else_hotkey": "1",
     "devil_fruit_hotkey": "2",
     "auto_buy_common_bait": false,
-    "auto_store_devil_fruit": false,
+    "auto_store_devil_fruit": true,
     "auto_select_top_bait": false,
     "left_point": {
         "x": 1053,

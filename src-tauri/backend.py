@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 import requests
 from datetime import datetime
+import re
 
 pyautogui.PAUSE = 0
 
@@ -37,34 +38,107 @@ class RegionSelectionWindow:
         self.IsWindowClosed = False
 
         self.RootWindow = tk.Tk()
-        self.RootWindow.attributes('-alpha', 0.6)
+        self.RootWindow.attributes('-alpha', 0.85)
         self.RootWindow.attributes('-topmost', True)
         self.RootWindow.overrideredirect(True)
+
         self.LeftBoundary, self.TopBoundary = InitialBoundingBox["x1"], InitialBoundingBox["y1"]
         self.RightBoundary, self.BottomBoundary = InitialBoundingBox["x2"], InitialBoundingBox["y2"]
+
         WindowWidth = self.RightBoundary - self.LeftBoundary
         WindowHeight = self.BottomBoundary - self.TopBoundary
+
         self.RootWindow.geometry(f"{WindowWidth}x{WindowHeight}+{self.LeftBoundary}+{self.TopBoundary}")
-        self.RootWindow.configure(bg='blue')
-        self.DrawingCanvas = tk.Canvas(self.RootWindow, bg='blue', highlightthickness=3, highlightbackground='black')
-        self.DrawingCanvas.pack(fill='both', expand=True)
+        self.RootWindow.configure(bg='#1e293b')
+
+        HeaderFrame = tk.Frame(self.RootWindow, bg='#0f172a', height=40)
+        HeaderFrame.pack(side='top', fill='x')
+        HeaderFrame.pack_propagate(False)
+
+        TitleLabel = tk.Label(
+            HeaderFrame,
+            text="📐 Select Region",
+            bg='#0f172a',
+            fg='#e2e8f0',
+            font=('Segoe UI', 10, 'bold'),
+            padx=15
+        )
+        TitleLabel.pack(side='left', pady=10)
+
+        ButtonContainer = tk.Frame(HeaderFrame, bg='#0f172a')
+        ButtonContainer.pack(side='right', padx=10, pady=5)
+
+        self.ConfirmButton = tk.Button(
+            ButtonContainer,
+            text="✓ Confirm",
+            command=self.CloseWindow,
+            bg='#10b981',
+            fg='white',
+            font=('Segoe UI', 9, 'bold'),
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            relief='flat',
+            borderwidth=0,
+            activebackground='#059669',
+            activeforeground='white'
+        )
+        self.ConfirmButton.pack(side='right')
+
+        self.ConfirmButton.bind('<Enter>', lambda e: self.ConfirmButton.config(bg='#059669'))
+        self.ConfirmButton.bind('<Leave>', lambda e: self.ConfirmButton.config(bg='#10b981'))
+
+        self.DrawingCanvas = tk.Canvas(
+            self.RootWindow,
+            bg='#1e293b',
+            highlightthickness=2,
+            highlightbackground='#3b82f6',
+            relief='flat'
+        )
+        self.DrawingCanvas.pack(fill='both', expand=True, padx=2, pady=2)
+
+        self.CreateCornerIndicators()
+
         self.IsDraggingWindow = False
         self.IsResizingWindow = False
         self.ActiveResizeEdge = None
+
         self.MouseDownPositionX = 0
         self.MouseDownPositionY = 0
         self.EdgeDetectionThreshold = 10
+
         self.DrawingCanvas.bind('<Button-1>', self.HandleMousePress)
         self.DrawingCanvas.bind('<B1-Motion>', self.HandleMouseDragMotion)
         self.DrawingCanvas.bind('<ButtonRelease-1>', self.HandleMouseRelease)
         self.DrawingCanvas.bind('<Motion>', self.HandleMouseHover)
         
-        self.RootWindow.bind('<Return>', lambda EventData: self.CloseWindow())
-        self.RootWindow.bind('<Escape>', lambda EventData: self.CloseWindow())
-        
         self.RootWindow.protocol("WM_DELETE_WINDOW", self.CloseWindow)
         
         self.RootWindow.mainloop()
+
+    def CreateCornerIndicators(self):
+        corner_size = 15
+        corner_color = '#3b82f6'
+        
+        self.RootWindow.update_idletasks()
+        canvas_width = self.DrawingCanvas.winfo_width()
+        canvas_height = self.DrawingCanvas.winfo_height()
+        
+        self.DrawingCanvas.create_rectangle(0, 0, corner_size, corner_size, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 0, 
+                                        canvas_width, corner_size, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(0, canvas_height - corner_size, 
+                                        corner_size, canvas_height, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 
+                                        canvas_height - corner_size, 
+                                        canvas_width, canvas_height, 
+                                        fill=corner_color, outline='')
 
     def HandleMouseHover(self, EventData):
         CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
@@ -179,7 +253,7 @@ class AutomatedFishingSystem:
         MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
 
         self.ConfigurationFilePath = "Auto Fish Settings.json"
-        self.GlobalHotkeyBindings = {"start_stop": "f1", "change_area": "f2", "exit": "f3"}
+        self.GlobalHotkeyBindings = {"start_stop": "f1", "exit": "f3"}
 
         self.WindowAlwaysOnTopEnabled = True
         self.DebugOverlayVisible = False
@@ -204,6 +278,9 @@ class AutomatedFishingSystem:
         self.AutomaticBaitPurchaseEnabled = True
         self.AutomaticFruitStorageEnabled = False
         self.AutomaticTopBaitSelectionEnabled = False
+
+        self.OCRReader = None
+        self.TextDetectionEnabled = True
 
         self.StoreToBackpackEnabled = False
         self.DevilFruitLocationPoint = None
@@ -434,10 +511,121 @@ class AutomatedFishingSystem:
         except Exception as SaveError:
             print(f"Error saving settings: {SaveError}")
     
+    def InitializeOCR(self):
+        if self.OCRReader is None and self.TextDetectionEnabled:
+            try:
+                print("Initializing OCR In Background...")
+                def LoadOCRInBackground():
+                    try:
+                        import easyocr
+                        self.OCRReader = easyocr.Reader(['en'], gpu=False, verbose=False)
+                        print("OCR Initialized Successfully!")
+                    except Exception as OCRInitError:
+                        print(f"OCR Initialization Error: {OCRInitError}")
+                        self.TextDetectionEnabled = False
+                
+                threading.Thread(target=LoadOCRInBackground, daemon=True).start()
+            except Exception as OCRInitError:
+                print(f"OCR Thread Error: {OCRInitError}")
+                self.TextDetectionEnabled = False
+
+    def DetectNewItemNotification(self):
+        try:
+            if self.OCRReader is None:
+                if not self.TextDetectionEnabled:
+                    return None
+                
+                self.InitializeOCR()
+                
+                print("Waiting For OCR To Initialize...")
+                WaitStartTime = time.time()
+                MaxWaitTime = 30.0
+                
+                while self.OCRReader is None and (time.time() - WaitStartTime) < MaxWaitTime:
+                    if not self.MacroCurrentlyExecuting:
+                        return None
+                    time.sleep(0.5)
+                
+                if self.OCRReader is None:
+                    print("OCR Initialization Timeout!")
+                    self.TextDetectionEnabled = False
+                    return None
+                
+                print("OCR Ready!")
+                
+            SystemDisplayMetrics = ctypes.windll.user32
+            MonitorWidth = SystemDisplayMetrics.GetSystemMetrics(0)
+            MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
+
+            ScanRegion = {
+                "top": 60,
+                "left": int(MonitorWidth * 0.35),
+                "width": int(MonitorWidth * 0.30),
+                "height": int(MonitorHeight * 0.30)
+            }
+
+            with mss.mss() as ScreenCapture:
+                ScreenshotData = ScreenCapture.grab(ScanRegion)
+                Image = np.array(ScreenshotData)
+
+            try:
+                from PIL import Image as PILImage
+                DebugImage = PILImage.frombytes('RGB', ScreenshotData.size, ScreenshotData.rgb)
+                DebugImage.save("ocr_debug_scan.png")
+                print("Debug Image Saved: ocr_debug_scan.png")
+            except Exception as SaveError:
+                print(f"Could Not Save Debug Image: {SaveError}")
+
+            ImageRGB = Image[:, :, [2, 1, 0]]
+            
+            print("Running OCR...")
+            Results = self.OCRReader.readtext(ImageRGB, detail=1, paragraph=False)
+            
+            print(f"OCR Found {len(Results)} Text Blocks")
+
+            FullText = ""
+            for Index, (BBox, Text, Confidence) in enumerate(Results):
+                print(f"  Block {Index + 1}: '{Text}' (Confidence: {Confidence:.2f})")
+                if Confidence > 0.2:
+                    FullText += Text + " "
+            
+            FullText = FullText.strip()
+            print(f"Combined Text: '{FullText}'")
+
+            if FullText and ("new" in FullText.lower() or "nev" in FullText.lower()):
+                if "item" in FullText.lower():
+                    print(f"Found 'New Item' In Text!")
+                    
+                    BracketMatch = re.search(r'<([^>]+)>', FullText, re.IGNORECASE)
+                    if BracketMatch:
+                        ItemName = BracketMatch.group(1).strip()
+                        print(f"✅ Extracted Fruit Name: {ItemName}")
+                        return ItemName
+                    
+                    AfterItemMatch = re.search(r'item\s+(.+)', FullText, re.IGNORECASE)
+                    if AfterItemMatch:
+                        ItemName = AfterItemMatch.group(1).strip()
+                        ItemName = ItemName.replace('<', '').replace('>', '').strip()
+                        if ItemName:
+                            print(f"✅ Extracted Fruit Name (No Brackets): {ItemName}")
+                            return ItemName
+                    
+                    print(f"⚠️ Could Not Extract Name, Returning Full Text")
+                    return FullText
+            else:
+                print("❌ No 'New Item' Text Found")
+            
+            return None
+            
+        except Exception as OCRCheckError:
+            print(f"OCR Check Error: {OCRCheckError}")
+            import traceback
+            traceback.print_exc()
+            return None
+        
     def RegisterAllHotkeyBindings(self):
         try:
             keyboard.add_hotkey(self.GlobalHotkeyBindings["start_stop"], self.ToggleMacroExecution)
-            keyboard.add_hotkey(self.GlobalHotkeyBindings["change_area"], self.ModifyScanningRegion)
             keyboard.add_hotkey(self.GlobalHotkeyBindings["exit"], self.TerminateApplicationImmediately)
         except Exception as HotkeyError:
             print(f"Error setting up hotkeys: {HotkeyError}")
@@ -786,9 +974,9 @@ class AutomatedFishingSystem:
                     if not self.MacroCurrentlyExecuting: return False
                     
                     if self.FruitStorageButtonLocation:
-                        initial_green_detected = False
+                        InitGreenDetected = False
                         if self.LogDevilFruitEnabled and self.DetectGreenishColor(self.FruitStorageButtonLocation):
-                            initial_green_detected = True
+                            InitGreenDetected = True
                             
                         ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
                         time.sleep(self.PreCastAntiDetectionDelay)
@@ -831,7 +1019,7 @@ class AutomatedFishingSystem:
                         keyboard.press_and_release('`')
                         time.sleep(self.FruitStorageHotkeyActivationDelay)
                     
-                        if initial_green_detected and self.WebhookUrl:
+                        if InitGreenDetected and self.WebhookUrl:
                             time.sleep(1.0)
                             if not self.MacroCurrentlyExecuting: return False
                             if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
@@ -853,9 +1041,9 @@ class AutomatedFishingSystem:
                     time.sleep(self.FruitStorageHotkeyActivationDelay)
                     if not self.MacroCurrentlyExecuting: return False
 
-                    initial_green_detected = False
+                    InitGreenDetected = False
                     if self.LogDevilFruitEnabled and self.DetectGreenishColor(self.FruitStorageButtonLocation):
-                        initial_green_detected = True
+                        InitGreenDetected = True
                             
                     ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
                     time.sleep(self.PreCastAntiDetectionDelay)
@@ -865,12 +1053,19 @@ class AutomatedFishingSystem:
                     time.sleep(self.FruitStorageClickConfirmationDelay)
                     if not self.MacroCurrentlyExecuting: return False
                     
-                    if initial_green_detected and self.WebhookUrl:
-                        time.sleep(1.0)
-                        if not self.MacroCurrentlyExecuting: return False
+                    if InitGreenDetected and self.WebhookUrl:
+                        DetectedFruitName = None
+                        if self.TextDetectionEnabled:
+                            print("trying to find fruit name via ocr...")
+                            DetectedFruitName = self.DetectNewItemNotification()
 
+                        if not self.MacroCurrentlyExecuting: return False
+                        print(DetectedFruitName)
                         if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
-                            self.SendWebhookNotification("Devil Fruit stored successfully!")
+                            if DetectedFruitName:
+                                self.SendWebhookNotification(f"Devil Fruit: '{DetectedFruitName}' stored successfully!")
+                            else:
+                                self.SendWebhookNotification("Devil Fruit stored successfully!")
                         else:
                             self.SendWebhookNotification("Devil Fruit could not be stored.")
                             keyboard.press_and_release('shift')
@@ -1367,6 +1562,7 @@ def ProcessIncomingCommand():
             'set_move_duration': lambda: handle_float_value('MoveDurationSeconds'),
             'set_webhook_url': lambda: handle_string_value('WebhookUrl'),
             'toggle_log_devil_fruit': lambda: handle_boolean_toggle('LogDevilFruitEnabled'),
+            'open_area_selector': lambda: handle_area_selector(),
         }
         
         if RequestedAction == 'rebind_hotkey':
@@ -1387,6 +1583,9 @@ def handle_point_selection(point_name):
     MacroSystemInstance.InitiatePointSelectionMode(point_name)
     return jsonify({"status": "waiting_for_click"})
 
+def handle_area_selector():
+    MacroSystemInstance.ModifyScanningRegion()
+    return jsonify({"status": "opening_selector"})
 
 def handle_boolean_toggle(attribute_name):
     ActionPayload = request.json.get('payload')
