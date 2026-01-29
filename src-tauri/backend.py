@@ -374,7 +374,23 @@ class AutomatedFishingSystem:
         if os.path.exists(self.ConfigurationFilePath):
             try:
                 with open(self.ConfigurationFilePath, 'r') as ConfigurationFileHandle:
-                    ParsedConfigurationData = json.load(ConfigurationFileHandle)
+                    FileContent = ConfigurationFileHandle.read().strip()
+                
+                    if not FileContent:
+                        print("Configuration file is empty. Using defaults.")
+                        ParsedConfigurationData = {}
+                    else:
+                        try:
+                            ParsedConfigurationData = json.loads(FileContent)
+                        except json.JSONDecodeError as JsonError:
+                            print(f"Configuration file corrupted: {JsonError}")
+                            print("Using defaults. Old file backed up.")
+                            try:
+                                BackupPath = self.ConfigurationFilePath + ".backup"
+                                os.rename(self.ConfigurationFilePath, BackupPath)
+                            except:
+                                pass
+                            ParsedConfigurationData = {}
 
                     self.GlobalHotkeyBindings.update(ParsedConfigurationData.get("Hotkeys", {}))
                     
@@ -397,14 +413,14 @@ class AutomatedFishingSystem:
                     DevilFruitPoints = ClickPoints.get("DevilFruit", {})
                     self.FruitStorageButtonLocation = DevilFruitPoints.get("StoreFruitPoint", None)
                     self.DevilFruitLocationPoint = DevilFruitPoints.get("DevilFruitLocationPoint", None)
-
-
                     
                     CraftingPoints = ClickPoints.get("Crafting", {})
                     self.CraftLeftButtonLocation = CraftingPoints.get("CraftLeftPoint", None)
                     self.CraftMiddleButtonLocation = CraftingPoints.get("CraftMiddlePoint", None)
                     self.CraftButtonLocation = CraftingPoints.get("CraftButtonPoint", None)
                     self.CloseMenuButtonLocation = CraftingPoints.get("CloseMenuPoint", None)
+                    self.AddRecipeButtonLocation = CraftingPoints.get("AddRecipePoint", None)
+                    self.TopRecipeSlotLocation = CraftingPoints.get("TopRecipePoint", None)
                     self.BaitRecipes = CraftingPoints.get("BaitRecipes", [])
                     self.CurrentRecipeIndex = CraftingPoints.get("CurrentRecipeIndex", 0)
                     
@@ -518,6 +534,8 @@ class AutomatedFishingSystem:
                             "CraftMiddlePoint": self.CraftMiddleButtonLocation,
                             "CraftButtonPoint": self.CraftButtonLocation,
                             "CloseMenuPoint": self.CloseMenuButtonLocation,
+                            "AddRecipePoint": self.AddRecipeButtonLocation,
+                            "TopRecipePoint": self.TopRecipeSlotLocation,
                             "BaitRecipes": self.BaitRecipes,
                             "CurrentRecipeIndex": self.CurrentRecipeIndex
                         }
@@ -887,7 +905,7 @@ class AutomatedFishingSystem:
 
         if not self.MacroCurrentlyExecuting:
             return False
-        
+
         if self.AutomaticBaitCraftingEnabled and all([
             self.CraftLeftButtonLocation,
             self.CraftMiddleButtonLocation,
@@ -914,7 +932,7 @@ class AutomatedFishingSystem:
                     keyboard.press_and_release('shift')
                     time.sleep(0.1)
                     if not self.MacroCurrentlyExecuting: return False
-                
+                time.sleep(2)
                 keyboard.press_and_release('t')
                 time.sleep(self.CraftMenuOpenDelay)
                 if not self.MacroCurrentlyExecuting: return False
@@ -1543,6 +1561,8 @@ class AutomatedFishingSystem:
             "rightPoint": self.ShopRightButtonLocation,
             "storeFruitPoint": self.FruitStorageButtonLocation,
             "baitPoint": self.BaitSelectionButtonLocation,
+            "topRecipePoint": self.TopRecipeSlotLocation,
+            "addRecipePoint": self.AddRecipeButtonLocation,
             "hotkeys": self.GlobalHotkeyBindings,
             "rodHotkey": self.FishingRodInventorySlot,
             "anythingElseHotkey": self.AlternateInventorySlot,
@@ -1641,7 +1661,7 @@ def ProcessIncomingCommand():
             'set_craft_middle_point': lambda: handle_point_selection('CraftMiddleButtonLocation'),
             'set_bait_recipe_point': lambda: handle_point_selection('BaitRecipeButtonLocation'),
             'set_add_recipe_point': lambda: handle_point_selection('AddRecipeButtonLocation'),
-            'set_top_recipe_point': lambda: handle_point_selection('TopRecipeButtonLocation'),
+            'set_top_recipe_point': lambda: handle_point_selection('TopRecipeSlotLocation'),
             'set_craft_button_point': lambda: handle_point_selection('CraftButtonLocation'),
             'set_close_menu_point': lambda: handle_point_selection('CloseMenuButtonLocation'),
             'toggle_store_to_backpack': lambda: handle_boolean_toggle('StoreToBackpackEnabled'),

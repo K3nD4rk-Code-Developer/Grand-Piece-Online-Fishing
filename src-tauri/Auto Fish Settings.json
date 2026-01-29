@@ -15,13 +15,13 @@
     },
     "ClickPoints": {
         "WaterPoint": {
-            "x": 1149,
-            "y": 280
+            "x": 1284,
+            "y": 189
         },
         "Shop": {
             "LeftPoint": {
-                "x": 1062,
-                "y": 1302
+                "x": 1093,
+                "y": 1198
             },
             "MiddlePoint": {
                 "x": 1289,
@@ -48,12 +48,12 @@
         },
         "Crafting": {
             "CraftLeftPoint": {
-                "x": 1042,
-                "y": 1292
+                "x": 1046,
+                "y": 1287
             },
             "CraftMiddlePoint": {
-                "x": 1276,
-                "y": 1304
+                "x": 1284,
+                "y": 1305
             },
             "CraftButtonPoint": {
                 "x": 1485,
@@ -63,23 +63,22 @@
                 "x": 1665,
                 "y": 348
             },
+            "AddRecipePoint": {
+                "x": 1486,
+                "y": 495
+            },
+            "TopRecipePoint": {
+                "x": 1808,
+                "y": 393
+            },
             "BaitRecipes": [
                 {
                     "BaitRecipePoint": {
-                        "x": 1025,
-                        "y": 800
+                        "x": 1028,
+                        "y": 804
                     },
                     "CraftsPerCycle": 40,
-                    "LoopsPerCraft": 5,
                     "SwitchFishCycle": 5
-                },
-                {
-                    "BaitRecipePoint": {
-                        "x": 1042,
-                        "y": 763
-                    },
-                    "CraftsPerCycle": 40,
-                    "SwitchFishCycle": 2
                 }
             ],
             "CurrentRecipeIndex": 0
@@ -93,10 +92,10 @@
         ]
     },
     "AutomationFeatures": {
-        "AutoBuyCommonBait": true,
+        "AutoBuyCommonBait": false,
         "AutoStoreDevilFruit": false,
         "AutoSelectTopBait": false,
-        "AutoCraftBait": false
+        "AutoCraftBait": true
     },
     "AutomationFrequencies": {
         "LoopsPerPurchase": 100,
