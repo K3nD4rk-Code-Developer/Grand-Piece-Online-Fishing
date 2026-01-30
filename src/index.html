@@ -1650,6 +1650,7 @@
         });
         const Result = await Response.json();
         if (Result.status === 'success') {
+          LastRenderedRecipes = null;
           await pollPythonState();
         }
       } catch (Error) {
@@ -1844,14 +1845,18 @@
       updatePointStatus('craftLeftPoint', state.craftLeftPoint?.x, state.craftLeftPoint?.y);
       updatePointStatus('craftMiddlePoint', state.craftMiddlePoint?.x, state.craftMiddlePoint?.y);
       updatePointStatus('baitRecipePoint', state.baitRecipePoint?.x, state.baitRecipePoint?.y);
-      updatePointStatus('addRecipePoint', state.addRecipePoint?.x, state.addRecipePoint?.y);
       updatePointStatus('topRecipePoint', state.topRecipePoint?.x, state.topRecipePoint?.y);
       updatePointStatus('craftButtonPoint', state.craftButtonPoint?.x, state.craftButtonPoint?.y);
       updatePointStatus('closeMenuPoint', state.closeMenuPoint?.x, state.closeMenuPoint?.y);
+      updatePointStatus('addRecipePoint', state.addRecipePoint?.x, state.addRecipePoint?.y);
       updatePointStatus('devilFruitLocationPoint', state.devilFruitLocationPoint?.x, state.devilFruitLocationPoint?.y);
 
       setInputValue('webhookUrl', state.webhookUrl || '');
       document.getElementById('logDevilFruit').checked = state.logDevilFruit || false;
+
+      if (state.baitRecipes !== undefined) {
+        RenderRecipes(state.baitRecipes)
+      }
 
       console.log('All settings loaded successfully');
     }
@@ -1875,9 +1880,11 @@
         updatePointStatus('baitPoint', state.baitPoint?.x, state.baitPoint?.y);
         updatePointStatus('craftLeftPoint', state.craftLeftPoint?.x, state.craftLeftPoint?.y);
         updatePointStatus('craftMiddlePoint', state.craftMiddlePoint?.x, state.craftMiddlePoint?.y);
-        updatePointStatus('craftButtonPoint', state.craftButtonPoint?.x, state.craftButtonPoint?.y);
         updatePointStatus('closeMenuPoint', state.closeMenuPoint?.x, state.closeMenuPoint?.y);
         updatePointStatus('devilFruitLocationPoint', state.devilFruitLocationPoint?.x, state.devilFruitLocationPoint?.y);
+        updatePointStatus('craftButtonPoint', state.craftButtonPoint?.x, state.craftButtonPoint?.y);
+        updatePointStatus('addRecipePoint', state.addRecipePoint?.x, state.addRecipePoint?.y);
+        updatePointStatus('topRecipePoint', state.topRecipePoint?.x, state.topRecipePoint?.y);
       } catch (error) {
         console.error('Failed to poll state:', error);
       }

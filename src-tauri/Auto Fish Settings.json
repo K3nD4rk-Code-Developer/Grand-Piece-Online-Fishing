@@ -15,8 +15,8 @@
     },
     "ClickPoints": {
         "WaterPoint": {
-            "x": 1304,
-            "y": 341
+            "x": 1603,
+            "y": 34
         },
         "Shop": {
             "LeftPoint": {
@@ -64,12 +64,12 @@
                 "y": 348
             },
             "AddRecipePoint": {
-                "x": 1486,
-                "y": 495
+                "x": 1863,
+                "y": 311
             },
             "TopRecipePoint": {
-                "x": 1808,
-                "y": 393
+                "x": 1664,
+                "y": 348
             },
             "BaitRecipes": [
                 {
@@ -99,7 +99,7 @@
         ]
     },
     "AutomationFeatures": {
-        "AutoBuyCommonBait": true,
+        "AutoBuyCommonBait": false,
         "AutoStoreDevilFruit": false,
         "AutoSelectTopBait": false,
         "AutoCraftBait": false
