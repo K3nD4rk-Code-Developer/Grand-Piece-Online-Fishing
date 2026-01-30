@@ -124,10 +124,10 @@ class AutomatedFishingSystem:
         self.PreCastKeyboardInputDelay = 0.25
         self.PreCastAntiDetectionDelay = 0.05
 
-        self.FruitStorageHotkeyActivationDelay = 1.0
-        self.FruitStorageClickConfirmationDelay = 2.0
-        self.FruitStorageShiftKeyPressDelay = 0.5
-        self.FruitStorageBackspaceDeletionDelay = 1.5
+        self.FruitStorageHotkeyActivationDelay = 0.2
+        self.FruitStorageClickConfirmationDelay = 0.25
+        self.FruitStorageShiftKeyPressDelay = 0.35
+        self.FruitStorageBackspaceDeletionDelay = 0.2
 
         self.BaitSelectionConfirmationDelay = 0.5
         self.InventorySlotSwitchingDelay = 0.2
@@ -137,7 +137,7 @@ class AutomatedFishingSystem:
         self.MouseMovementAntiDetectionDelay = 0.05
         self.ImageProcessingLoopDelay = 0.1
 
-        self.MoveDurationSeconds = 4.25
+        self.MoveDurationSeconds = 0
         self.CraftMenuOpenDelay = 0.85
         self.CraftClickDelay = 0.2
         self.CraftRecipeSelectDelay = 0.2
@@ -485,7 +485,6 @@ class AutomatedFishingSystem:
                 
                 self.InitializeOCR()
                 
-                print("Waiting For OCR To Initialize...")
                 WaitStartTime = time.time()
                 MaxWaitTime = 30.0
                 
@@ -495,12 +494,9 @@ class AutomatedFishingSystem:
                     time.sleep(0.5)
                 
                 if self.OCRReader is None:
-                    print("OCR Initialization Timeout!")
                     self.TextDetectionEnabled = False
                     return None
-                
-                print("OCR Ready!")
-                
+                                
             SystemDisplayMetrics = ctypes.windll.user32
             MonitorWidth = SystemDisplayMetrics.GetSystemMetrics(0)
             MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
@@ -1000,7 +996,7 @@ class AutomatedFishingSystem:
                         if not self.MacroCurrentlyExecuting: return False
 
                         InitGreenDetected = False
-                        if self.LogDevilFruitEnabled and self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                        if self.DetectGreenishColor(self.FruitStorageButtonLocation):
                             InitGreenDetected = True
                                 
                         ctypes.windll.user32.SetCursorPos(self.FruitStorageButtonLocation['x'], self.FruitStorageButtonLocation['y'])
@@ -1011,14 +1007,12 @@ class AutomatedFishingSystem:
                         time.sleep(self.FruitStorageClickConfirmationDelay)
                         if not self.MacroCurrentlyExecuting: return False
                         
-                        if InitGreenDetected and self.WebhookUrl:
-                            DetectedFruitName = None
-                            if self.TextDetectionEnabled:
-                                DetectedFruitName = self.DetectNewItemNotification()
-
-                            if not self.MacroCurrentlyExecuting: return False
-
-                            if not self.DetectGreenishColor(self.FruitStorageButtonLocation):
+                        if InitGreenDetected:
+                            if not self.DetectGreenishColor(self.FruitStorageButtonLocation) and self.WebhookUrl:
+                                DetectedFruitName = None
+                                if self.TextDetectionEnabled:
+                                    DetectedFruitName = self.DetectNewItemNotification()
+                                    
                                 def GetClosestFruit(Name, Cutoff=0.6):
                                     KnownFruits = {
                                         "Soul", "Dragon", "Mochi", "Ope", "Tori", "Buddha",
@@ -1038,17 +1032,20 @@ class AutomatedFishingSystem:
                                 else:
                                     self.SendWebhookNotification("Devil Fruit stored successfully!")
                             else:
-                                self.SendWebhookNotification("Devil Fruit could not be stored.")
-                                keyboard.press_and_release('shift')
-                                time.sleep(self.FruitStorageShiftKeyPressDelay)
-                                if not self.MacroCurrentlyExecuting: return False
+                                if self.WebhookUrl:
+                                    self.SendWebhookNotification("Devil Fruit could not be stored.")
+
+                                if self.AutomaticBaitPurchaseEnabled:
+                                    keyboard.press_and_release('shift')
+                                    time.sleep(self.FruitStorageShiftKeyPressDelay)
+                                    if not self.MacroCurrentlyExecuting: return False
                                 
                                 keyboard.press_and_release('backspace')
                                 time.sleep(self.FruitStorageBackspaceDeletionDelay)
                                 if not self.MacroCurrentlyExecuting: return False
-                                
-                                keyboard.press_and_release('shift')
-                
+
+                                if self.AutomaticBaitPurchaseEnabled:
+                                    keyboard.press_and_release('shift')
                     
                 self.DevilFruitStorageIterationCounter = 1
             else:
@@ -1165,7 +1162,7 @@ class AutomatedFishingSystem:
         
         return BlackPixelRatio >= self.BlackScreenDetectionRatioThreshold
     
-    def DetectGreenishColor(self, TargetPoint, ToleranceRadius=20):
+    def DetectGreenishColor(self, TargetPoint, ToleranceRadius=15):
         if not TargetPoint:
             return False
         
@@ -1184,17 +1181,30 @@ class AutomatedFishingSystem:
             RedChannel = ScreenImageArray[:, :, 2]
             BlueChannel = ScreenImageArray[:, :, 0]
             
+            WhiteMask = (
+                (RedChannel > 200) & 
+                (GreenChannel > 200) & 
+                (BlueChannel > 200) &
+                (np.abs(RedChannel - GreenChannel) < 30) &
+                (np.abs(GreenChannel - BlueChannel) < 30)
+            )
+            
             GreenishMask = (
-                (GreenChannel > RedChannel + 20) & 
-                (GreenChannel > BlueChannel + 20) &
-                (GreenChannel > 80)
+                (GreenChannel > RedChannel + 30) &
+                (GreenChannel > BlueChannel + 30) &
+                (GreenChannel > 100) &
+                ~WhiteMask
             )
             
             GreenPixelCount = np.sum(GreenishMask)
-            TotalPixels = ScreenImageArray.shape[0] * ScreenImageArray.shape[1]
-            GreenRatio = GreenPixelCount / TotalPixels
+            NonWhitePixels = np.sum(~WhiteMask)
             
-            return GreenRatio > 0.10
+            if NonWhitePixels == 0:
+                return False
+            
+            GreenRatio = GreenPixelCount / NonWhitePixels
+            
+            return GreenRatio > 0.20
             
         except Exception as e:
             print(f"Error detecting green color: {e}")

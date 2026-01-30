@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPO Fishing Macro</title>
+  <title>K's GPO Fishing Macro</title>
   <style>
     * {
       margin: 0;
@@ -697,10 +697,10 @@
       <div class="brand">
         <div class="logo">K</div>
         <div class="title-group">
-          <h1>GPO Fishing Macro</h1>
+          <h1>K's GPO Fishing Macro</h1>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="version">Version 1.2.4</div>
-            <div style="color: #888; opacity: 0.2; font-size: 0.75em;">92e429c53f74bfd6673d2816791641e7</div>
+            <div class="version">Version 1.2.5</div>
+            <div style="color: #888; opacity: 0.2; font-size: 0.75em;">d8f21aa07734771529f92a982e323cad</div>
           </div>
         </div>
       </div>
@@ -867,6 +867,20 @@
               </div>
             </div>
             <div class="control-group">
+              <span class="control-label">Add Ingredient</span>
+              <div class="control-input">
+                <span class="point-indicator unset" id="addRecipePointStatus">Not Configured</span>
+                <button class="btn btn-sm" onclick="sendToPython('set_add_recipe_point', '')">Configure</button>
+              </div>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Top Recipe Slot</span>
+              <div class="control-input">
+                <span class="point-indicator unset" id="topRecipePointStatus">Not Configured</span>
+                <button class="btn btn-sm" onclick="sendToPython('set_top_recipe_point', '')">Configure</button>
+              </div>
+            </div>
+            <div class="control-group">
               <span class="control-label">Click Craft Confirm</span>
               <div class="control-input">
                 <span class="point-indicator unset" id="craftButtonPointStatus">Not Configured</span>
@@ -908,6 +922,7 @@
                   onclick="sendToPython('set_devil_fruit_location_point', '')">Configure</button>
               </div>
             </div>
+            <div class="help-hint">This feature is still a work in progress, don't mind it. Used for storing inside of backpack instead of drop</div>
           </div>
 
           <div class="card">
@@ -965,23 +980,9 @@
               <div class="control-group">
                 <span class="control-label">Movement Duration</span>
                 <div class="control-input">
-                  <input type="number" class="input" id="moveDuration" value="4.25" step="0.25"
+                  <input type="number" class="input" id="moveDuration" value="0" step="0.25"
                     onchange="sendToPython('set_move_duration', this.value)">
                   <span class="unit">seconds</span>
-                </div>
-              </div>
-              <div class="control-group">
-                <span class="control-label">Add Recipe</span>
-                <div class="control-input">
-                  <span class="point-indicator unset" id="addRecipePointStatus">Not Configured</span>
-                  <button class="btn btn-sm" onclick="sendToPython('set_add_recipe_point', '')">Configure</button>
-                </div>
-              </div>
-              <div class="control-group">
-                <span class="control-label">Top Recipe Slot</span>
-                <div class="control-input">
-                  <span class="point-indicator unset" id="topRecipePointStatus">Not Configured</span>
-                  <button class="btn btn-sm" onclick="sendToPython('set_top_recipe_point', '')">Configure</button>
                 </div>
               </div>
             </div>
@@ -1443,7 +1444,14 @@
 
     function renderDevilFruitSlotSelector(selectedSlots) {
       const container = document.getElementById('devilFruitSlotSelector');
-      if (!container) return;
+      if (!container) {
+        setTimeout(() => renderDevilFruitSlotSelector(selectedSlots), 100);
+        return;
+      }
+
+      if (!selectedSlots || !Array.isArray(selectedSlots)) {
+        selectedSlots = ['3'];
+      }
 
       container.innerHTML = '';
 
@@ -1452,23 +1460,23 @@
         button.className = 'btn btn-sm slot-button';
         button.textContent = i.toString();
 
-        const isSelected = selectedSlots && selectedSlots.includes(i.toString());
+        const isSelected = selectedSlots.includes(i.toString());
 
         if (isSelected) {
           button.style.cssText = `
-        min-width: 36px; 
-        padding: 6px 10px;
-        background: linear-gradient(135deg, #00d4ff, #0099ff);
-        border-color: #00d4ff;
-        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
-      `;
+      min-width: 36px; 
+      padding: 6px 10px;
+      background: linear-gradient(135deg, #00d4ff, #0099ff);
+      border-color: #00d4ff;
+      box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+    `;
         } else {
           button.style.cssText = `
-        min-width: 36px; 
-        padding: 6px 10px;
-        background: linear-gradient(135deg, rgba(75, 85, 99, 0.5), rgba(55, 65, 81, 0.6));
-        box-shadow: none;
-      `;
+      min-width: 36px; 
+      padding: 6px 10px;
+      background: linear-gradient(135deg, rgba(75, 85, 99, 0.5), rgba(55, 65, 81, 0.6));
+      box-shadow: none;
+    `;
         }
 
         button.onclick = () => toggleDevilFruitSlot(i.toString());
@@ -1782,7 +1790,7 @@
         dfSlots = [dfSlots];
       }
       window.currentDevilFruitSlots = dfSlots;
-      renderDevilFruitSlotSelector(dfSlots);
+      setTimeout(() => renderDevilFruitSlotSelector(dfSlots), 100);
 
       setToggleState('alwaysOnTopToggle', state.alwaysOnTop);
       setToggleState('debugOverlayToggle', state.showDebugOverlay);
@@ -1860,6 +1868,21 @@
 
       console.log('All settings loaded successfully');
     }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      checkDisclaimer();
+      await loadInitialSettings();
+
+      setTimeout(() => {
+        const container = document.getElementById('devilFruitSlotSelector');
+        if (container && container.children.length === 0) {
+          const slots = window.currentDevilFruitSlots || ['3'];
+          renderDevilFruitSlotSelector(slots);
+        }
+      }, 500);
+
+      startPolling();
+    });
 
     async function pollPythonState() {
       try {

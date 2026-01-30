@@ -15,17 +15,17 @@
     },
     "ClickPoints": {
         "WaterPoint": {
-            "x": 1603,
-            "y": 34
+            "x": 1138,
+            "y": 333
         },
         "Shop": {
             "LeftPoint": {
-                "x": 1060,
-                "y": 1305
+                "x": 1046,
+                "y": 1296
             },
             "MiddlePoint": {
-                "x": 1283,
-                "y": 1303
+                "x": 1282,
+                "y": 1299
             },
             "RightPoint": {
                 "x": 1515,
@@ -38,7 +38,7 @@
         },
         "DevilFruit": {
             "StoreFruitPoint": {
-                "x": 1378,
+                "x": 1291,
                 "y": 1147
             },
             "DevilFruitLocationPoint": {
@@ -64,12 +64,12 @@
                 "y": 348
             },
             "AddRecipePoint": {
-                "x": 1863,
-                "y": 311
+                "x": 1483,
+                "y": 490
             },
             "TopRecipePoint": {
-                "x": 1664,
-                "y": 348
+                "x": 1846,
+                "y": 393
             },
             "BaitRecipes": [
                 {
@@ -89,24 +89,24 @@
         "AnythingElseHotkey": "1",
         "DevilFruitHotkeys": [
             "3",
+            "2",
             "4",
             "5",
             "6",
             "7",
             "8",
-            "9",
-            "2"
+            "9"
         ]
     },
     "AutomationFeatures": {
         "AutoBuyCommonBait": false,
-        "AutoStoreDevilFruit": false,
+        "AutoStoreDevilFruit": true,
         "AutoSelectTopBait": false,
-        "AutoCraftBait": false
+        "AutoCraftBait": true
     },
     "AutomationFrequencies": {
         "LoopsPerPurchase": 100,
-        "LoopsPerStore": 5,
+        "LoopsPerStore": 1,
         "LoopsPerCraft": 5,
         "CraftsPerCycle": 40,
         "FishCountPerCraft": 3
@@ -152,10 +152,10 @@
             "AutoSelectBaitDelay": 0.5
         },
         "DevilFruitStorage": {
-            "StoreFruitHotkeyDelay": 0.5,
-            "StoreFruitClickDelay": 1.0,
-            "StoreFruitShiftDelay": 0.5,
-            "StoreFruitBackspaceDelay": 1.5
+            "StoreFruitHotkeyDelay": 0.2,
+            "StoreFruitClickDelay": 0.25,
+            "StoreFruitShiftDelay": 0.35,
+            "StoreFruitBackspaceDelay": 0.2
         },
         "AntiDetection": {
             "CursorAntiDetectDelay": 0.05,
