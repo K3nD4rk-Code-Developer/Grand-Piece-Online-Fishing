@@ -527,6 +527,167 @@
       margin-top: 8px;
       font-style: italic;
     }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal-container {
+      background: linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(17, 24, 39, 0.98) 100%);
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      max-width: 500px;
+      max-height: 80vh;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(0, 153, 255, 0.1));
+      padding: 32px 32px 24px 32px;
+      border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+      text-align: center;
+    }
+
+    .modal-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .modal-header h2 {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, #d1d5db 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .modal-body {
+      padding: 32px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .modal-body::-webkit-scrollbar-track {
+      background: rgba(17, 24, 39, 0.5);
+    }
+
+    .modal-body::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(0, 212, 255, 0.4), rgba(0, 153, 255, 0.4));
+      border-radius: 3px;
+    }
+
+    .modal-body::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(0, 212, 255, 0.6), rgba(0, 153, 255, 0.6));
+    }
+
+    .disclaimer-section {
+      margin-bottom: 24px;
+    }
+
+    .disclaimer-section h3 {
+      color: #00d4ff;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .disclaimer-section p {
+      color: #d1d5db;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .creator-name {
+      color: #00d4ff;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .credit-notice {
+      font-style: italic;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .warning-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .warning-box p {
+      color: #fca5a5;
+    }
+
+    .modal-footer {
+      padding: 24px 32px;
+      background: rgba(17, 24, 39, 0.5);
+      border-top: 1px solid rgba(0, 212, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .btn-primary {
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 16px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 212, 255, 0.6);
+    }
   </style>
 </head>
 
@@ -537,7 +698,10 @@
         <div class="logo">K</div>
         <div class="title-group">
           <h1>GPO Fishing Macro</h1>
-          <div class="version">Version 1.2.4</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="version">Version 1.2.4</div>
+            <div style="color: #888; opacity: 0.2; font-size: 0.75em;">0410d955d367b2448ac3aa78752cc6c6</div>
+          </div>
         </div>
       </div>
       <div class="status-badge">
@@ -1204,9 +1368,62 @@
       </div>
     </div>
   </div>
+
+  <div id="disclaimerModal" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-icon">⚠️</div>
+        <h2>Important Notice</h2>
+      </div>
+      <div class="modal-body">
+        <div class="disclaimer-section">
+          <h3>Free & Open Source Software</h3>
+          <p>This macro is <strong>completely free</strong> and made for public use. It should <strong>never be bought
+              or
+              resold</strong> to anyone under any circumstances.</p>
+        </div>
+        <div class="disclaimer-section">
+          <h3>Creator Attribution</h3>
+          <p>Created by <strong class="creator-name">KenNumi</strong></p>
+          <p class="credit-notice">If you reproduce, modify, or redistribute this software, you must give proper credit
+            to
+            the original creator.</p>
+        </div>
+        <div class="disclaimer-section warning-box">
+          <p><strong>Warning:</strong> Anyone charging money for this software is scamming you. Please
+            report such incidents and obtain the macro from official sources only.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label class="checkbox-container">
+          <input type="checkbox" id="dontShowAgain">
+          <span class="checkbox-label">Don't show this again</span>
+        </label>
+        <button class="btn btn-primary" onclick="closeDisclaimer()">I Understand</button>
+      </div>
+    </div>
   </div>
 
   <script>
+    function checkDisclaimer() {
+      const hideDisclaimer = localStorage.getItem('hideDisclaimer');
+      const modal = document.getElementById('disclaimerModal');
+
+      if (hideDisclaimer === 'true') {
+        modal.style.display = 'none';
+      } else {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeDisclaimer() {
+      const dontShowAgain = document.getElementById('dontShowAgain').checked;
+      if (dontShowAgain) {
+        localStorage.setItem('hideDisclaimer', 'true');
+      }
+      document.getElementById('disclaimerModal').style.display = 'none';
+    }
+
     document.querySelectorAll('.nav-item').forEach(nav => {
       nav.addEventListener('click', () => {
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1225,58 +1442,58 @@
     }
 
     function renderDevilFruitSlotSelector(selectedSlots) {
-        const container = document.getElementById('devilFruitSlotSelector');
-        if (!container) return;
+      const container = document.getElementById('devilFruitSlotSelector');
+      if (!container) return;
 
-        container.innerHTML = '';
+      container.innerHTML = '';
 
-        for (let i = 0; i <= 9; i++) {
-          const button = document.createElement('button');
-          button.className = 'btn btn-sm slot-button';
-          button.textContent = i.toString();
+      for (let i = 0; i <= 9; i++) {
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm slot-button';
+        button.textContent = i.toString();
 
-          const isSelected = selectedSlots && selectedSlots.includes(i.toString());
+        const isSelected = selectedSlots && selectedSlots.includes(i.toString());
 
-          if (isSelected) {
-            button.style.cssText = `
+        if (isSelected) {
+          button.style.cssText = `
         min-width: 36px; 
         padding: 6px 10px;
         background: linear-gradient(135deg, #00d4ff, #0099ff);
         border-color: #00d4ff;
         box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
       `;
-          } else {
-            button.style.cssText = `
+        } else {
+          button.style.cssText = `
         min-width: 36px; 
         padding: 6px 10px;
         background: linear-gradient(135deg, rgba(75, 85, 99, 0.5), rgba(55, 65, 81, 0.6));
         box-shadow: none;
       `;
-          }
-
-          button.onclick = () => toggleDevilFruitSlot(i.toString());
-          container.appendChild(button);
         }
+
+        button.onclick = () => toggleDevilFruitSlot(i.toString());
+        container.appendChild(button);
+      }
+    }
+
+    function toggleDevilFruitSlot(slot) {
+      let currentSlots = window.currentDevilFruitSlots || ['3'];
+
+      if (currentSlots.includes(slot)) {
+        currentSlots = currentSlots.filter(s => s !== slot);
+      } else {
+        currentSlots.push(slot);
       }
 
-      function toggleDevilFruitSlot(slot) {
-        let currentSlots = window.currentDevilFruitSlots || ['3'];
-
-        if (currentSlots.includes(slot)) {
-          currentSlots = currentSlots.filter(s => s !== slot);
-        } else {
-          currentSlots.push(slot);
-        }
-
-        if (currentSlots.length === 0) {
-          currentSlots = ['3'];
-        }
-
-        window.currentDevilFruitSlots = currentSlots;
-        renderDevilFruitSlotSelector(currentSlots);
-
-        sendToPython('set_devil_fruit_hotkeys', currentSlots.join(','));
+      if (currentSlots.length === 0) {
+        currentSlots = ['3'];
       }
+
+      window.currentDevilFruitSlots = currentSlots;
+      renderDevilFruitSlotSelector(currentSlots);
+
+      sendToPython('set_devil_fruit_hotkeys', currentSlots.join(','));
+    }
 
     function toggleExpandable(settingName, expandId) {
       const toggle = document.getElementById(`${settingName}Toggle`);
@@ -1684,7 +1901,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      console.log('DOM loaded, initializing...');
+      checkDisclaimer();
       loadInitialSettings();
       startPolling();
     });

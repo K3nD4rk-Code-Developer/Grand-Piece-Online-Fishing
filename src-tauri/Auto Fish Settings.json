@@ -8,28 +8,28 @@
         "ShowDebugOverlay": true
     },
     "ScanArea": {
-        "x1": 1292,
-        "y1": 510,
-        "x2": 1709,
-        "y2": 1132
+        "x1": 1296,
+        "y1": 499,
+        "x2": 1713,
+        "y2": 1121
     },
     "ClickPoints": {
         "WaterPoint": {
-            "x": 1284,
-            "y": 189
+            "x": 1304,
+            "y": 341
         },
         "Shop": {
             "LeftPoint": {
-                "x": 1093,
-                "y": 1198
+                "x": 1060,
+                "y": 1305
             },
             "MiddlePoint": {
-                "x": 1289,
-                "y": 1312
+                "x": 1283,
+                "y": 1303
             },
             "RightPoint": {
-                "x": 1509,
-                "y": 1299
+                "x": 1515,
+                "y": 1295
             }
         },
         "BaitPoint": {
@@ -74,8 +74,8 @@
             "BaitRecipes": [
                 {
                     "BaitRecipePoint": {
-                        "x": 1028,
-                        "y": 804
+                        "x": 1034,
+                        "y": 801
                     },
                     "CraftsPerCycle": 40,
                     "SwitchFishCycle": 5
@@ -88,18 +88,25 @@
         "RodHotkey": "0",
         "AnythingElseHotkey": "1",
         "DevilFruitHotkeys": [
-            "3"
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "2"
         ]
     },
     "AutomationFeatures": {
-        "AutoBuyCommonBait": false,
+        "AutoBuyCommonBait": true,
         "AutoStoreDevilFruit": false,
         "AutoSelectTopBait": false,
-        "AutoCraftBait": true
+        "AutoCraftBait": false
     },
     "AutomationFrequencies": {
         "LoopsPerPurchase": 100,
-        "LoopsPerStore": 1,
+        "LoopsPerStore": 5,
         "LoopsPerCraft": 5,
         "CraftsPerCycle": 40,
         "FishCountPerCraft": 3

@@ -18,6 +18,7 @@ import requests
 from datetime import datetime
 from difflib import get_close_matches
 import re
+import sys
 
 pyautogui.PAUSE = 0
 
@@ -32,228 +33,19 @@ except:
 FlaskApplication = Flask(__name__)
 CORS(FlaskApplication)
 
-class RegionSelectionWindow:
-    def __init__(self, ParentWindow, InitialBoundingBox, CompletionCallback):
-        self.CompletionCallback = CompletionCallback
-        self.ParentWindow = ParentWindow
-        self.IsWindowClosed = False
-
-        self.RootWindow = tk.Tk()
-        self.RootWindow.attributes('-alpha', 0.85)
-        self.RootWindow.attributes('-topmost', True)
-        self.RootWindow.overrideredirect(True)
-
-        self.LeftBoundary, self.TopBoundary = InitialBoundingBox["x1"], InitialBoundingBox["y1"]
-        self.RightBoundary, self.BottomBoundary = InitialBoundingBox["x2"], InitialBoundingBox["y2"]
-
-        WindowWidth = self.RightBoundary - self.LeftBoundary
-        WindowHeight = self.BottomBoundary - self.TopBoundary
-
-        self.RootWindow.geometry(f"{WindowWidth}x{WindowHeight}+{self.LeftBoundary}+{self.TopBoundary}")
-        self.RootWindow.configure(bg='#1e293b')
-
-        HeaderFrame = tk.Frame(self.RootWindow, bg='#0f172a', height=40)
-        HeaderFrame.pack(side='top', fill='x')
-        HeaderFrame.pack_propagate(False)
-
-        TitleLabel = tk.Label(
-            HeaderFrame,
-            text="📐 Select Region",
-            bg='#0f172a',
-            fg='#e2e8f0',
-            font=('Segoe UI', 10, 'bold'),
-            padx=15
-        )
-        TitleLabel.pack(side='left', pady=10)
-
-        ButtonContainer = tk.Frame(HeaderFrame, bg='#0f172a')
-        ButtonContainer.pack(side='right', padx=10, pady=5)
-
-        self.ConfirmButton = tk.Button(
-            ButtonContainer,
-            text="✓ Confirm",
-            command=self.CloseWindow,
-            bg='#10b981',
-            fg='white',
-            font=('Segoe UI', 9, 'bold'),
-            padx=20,
-            pady=8,
-            cursor='hand2',
-            relief='flat',
-            borderwidth=0,
-            activebackground='#059669',
-            activeforeground='white'
-        )
-        self.ConfirmButton.pack(side='right')
-
-        self.ConfirmButton.bind('<Enter>', lambda e: self.ConfirmButton.config(bg='#059669'))
-        self.ConfirmButton.bind('<Leave>', lambda e: self.ConfirmButton.config(bg='#10b981'))
-
-        self.DrawingCanvas = tk.Canvas(
-            self.RootWindow,
-            bg='#1e293b',
-            highlightthickness=2,
-            highlightbackground='#3b82f6',
-            relief='flat'
-        )
-        self.DrawingCanvas.pack(fill='both', expand=True, padx=2, pady=2)
-
-        self.CreateCornerIndicators()
-
-        self.IsDraggingWindow = False
-        self.IsResizingWindow = False
-        self.ActiveResizeEdge = None
-
-        self.MouseDownPositionX = 0
-        self.MouseDownPositionY = 0
-        self.EdgeDetectionThreshold = 10
-
-        self.DrawingCanvas.bind('<Button-1>', self.HandleMousePress)
-        self.DrawingCanvas.bind('<B1-Motion>', self.HandleMouseDragMotion)
-        self.DrawingCanvas.bind('<ButtonRelease-1>', self.HandleMouseRelease)
-        self.DrawingCanvas.bind('<Motion>', self.HandleMouseHover)
-        
-        self.RootWindow.protocol("WM_DELETE_WINDOW", self.CloseWindow)
-        
-        self.RootWindow.mainloop()
-
-    def CreateCornerIndicators(self):
-        corner_size = 15
-        corner_color = '#3b82f6'
-        
-        self.RootWindow.update_idletasks()
-        canvas_width = self.DrawingCanvas.winfo_width()
-        canvas_height = self.DrawingCanvas.winfo_height()
-        
-        self.DrawingCanvas.create_rectangle(0, 0, corner_size, corner_size, 
-                                        fill=corner_color, outline='')
-        
-        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 0, 
-                                        canvas_width, corner_size, 
-                                        fill=corner_color, outline='')
-        
-        self.DrawingCanvas.create_rectangle(0, canvas_height - corner_size, 
-                                        corner_size, canvas_height, 
-                                        fill=corner_color, outline='')
-        
-        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 
-                                        canvas_height - corner_size, 
-                                        canvas_width, canvas_height, 
-                                        fill=corner_color, outline='')
-
-    def HandleMouseHover(self, EventData):
-        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
-        CurrentWindowWidth = self.RootWindow.winfo_width()
-        CurrentWindowHeight = self.RootWindow.winfo_height()
-        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
-        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
-        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
-        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
-
-        if IsNearLeftEdge and IsNearTopEdge:
-            self.DrawingCanvas.config(cursor='top_left_corner')
-        elif IsNearRightEdge and IsNearTopEdge:
-            self.DrawingCanvas.config(cursor='top_right_corner')
-        elif IsNearLeftEdge and IsNearBottomEdge:
-            self.DrawingCanvas.config(cursor='bottom_left_corner')
-        elif IsNearRightEdge and IsNearBottomEdge:
-            self.DrawingCanvas.config(cursor='bottom_right_corner')
-        elif IsNearLeftEdge or IsNearRightEdge:
-            self.DrawingCanvas.config(cursor='sb_h_double_arrow')
-        elif IsNearTopEdge or IsNearBottomEdge:
-            self.DrawingCanvas.config(cursor='sb_v_double_arrow')
-        else:
-            self.DrawingCanvas.config(cursor='fleur')
-
-    def HandleMousePress(self, EventData):
-        self.MouseDownPositionX = EventData.x
-        self.MouseDownPositionY = EventData.y
-        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
-        CurrentWindowWidth = self.RootWindow.winfo_width()
-        CurrentWindowHeight = self.RootWindow.winfo_height()
-        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
-        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
-        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
-        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
-
-        if IsNearLeftEdge or IsNearRightEdge or IsNearTopEdge or IsNearBottomEdge:
-            self.IsResizingWindow = True
-            self.ActiveResizeEdge = {'left': IsNearLeftEdge, 'right': IsNearRightEdge, 'top': IsNearTopEdge, 'bottom': IsNearBottomEdge}
-        else:
-            self.IsDraggingWindow = True
-
-    def HandleMouseDragMotion(self, EventData):
-        if self.IsDraggingWindow:
-            HorizontalDelta = EventData.x - self.MouseDownPositionX
-            VerticalDelta = EventData.y - self.MouseDownPositionY
-            UpdatedWindowX = self.RootWindow.winfo_x() + HorizontalDelta
-            UpdatedWindowY = self.RootWindow.winfo_y() + VerticalDelta
-            self.RootWindow.geometry(f"+{UpdatedWindowX}+{UpdatedWindowY}")
-        elif self.IsResizingWindow:
-            CurrentWindowX = self.RootWindow.winfo_x()
-            CurrentWindowY = self.RootWindow.winfo_y()
-            CurrentWindowWidth = self.RootWindow.winfo_width()
-            CurrentWindowHeight = self.RootWindow.winfo_height()
-            UpdatedWindowX = CurrentWindowX
-            UpdatedWindowY = CurrentWindowY
-            UpdatedWindowWidth = CurrentWindowWidth
-            UpdatedWindowHeight = CurrentWindowHeight
-
-            if self.ActiveResizeEdge['left']:
-                HorizontalDelta = EventData.x - self.MouseDownPositionX
-                UpdatedWindowX = CurrentWindowX + HorizontalDelta
-                UpdatedWindowWidth = CurrentWindowWidth - HorizontalDelta
-            elif self.ActiveResizeEdge['right']:
-                UpdatedWindowWidth = EventData.x
-
-            if self.ActiveResizeEdge['top']:
-                VerticalDelta = EventData.y - self.MouseDownPositionY
-                UpdatedWindowY = CurrentWindowY + VerticalDelta
-                UpdatedWindowHeight = CurrentWindowHeight - VerticalDelta
-            elif self.ActiveResizeEdge['bottom']:
-                UpdatedWindowHeight = EventData.y
-
-            if UpdatedWindowWidth < 50:
-                UpdatedWindowWidth = 50
-                UpdatedWindowX = CurrentWindowX
-            if UpdatedWindowHeight < 50:
-                UpdatedWindowHeight = 50
-                UpdatedWindowY = CurrentWindowY
-
-            self.RootWindow.geometry(f"{UpdatedWindowWidth}x{UpdatedWindowHeight}+{UpdatedWindowX}+{UpdatedWindowY}")
-
-    def HandleMouseRelease(self, EventData):
-        self.IsDraggingWindow = False
-        self.IsResizingWindow = False
-        self.ActiveResizeEdge = None
-
-    def CloseWindow(self):
-        if self.IsWindowClosed:
-            return
-        self.IsWindowClosed = True
-        
-        try:
-            FinalLeftBoundary = self.RootWindow.winfo_x()
-            FinalTopBoundary = self.RootWindow.winfo_y()
-            FinalRightBoundary = FinalLeftBoundary + self.RootWindow.winfo_width()
-            FinalBottomBoundary = FinalTopBoundary + self.RootWindow.winfo_height()
-            FinalCoordinates = {"x1": FinalLeftBoundary, "y1": FinalTopBoundary, "x2": FinalRightBoundary, "y2": FinalBottomBoundary}
-            
-            self.RootWindow.quit()
-            self.RootWindow.destroy()
-            
-            if self.CompletionCallback:
-                self.CompletionCallback(FinalCoordinates)
-        except Exception as ErrorDetails:
-            print(f"Error closing area selector: {ErrorDetails}")
-
 class AutomatedFishingSystem:
     def __init__(self):
         SystemDisplayMetrics = ctypes.windll.user32
         MonitorWidth = SystemDisplayMetrics.GetSystemMetrics(0)
         MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
 
-        self.ConfigurationFilePath = "Auto Fish Settings.json"
+        if getattr(sys, 'frozen', False):
+            ApplicationPath = os.path.dirname(sys.executable)
+        else:
+            ApplicationPath = os.path.dirname(os.path.abspath(__file__))
+
+        self.ConfigurationFilePath = os.path.join(ApplicationPath, "Auto Fish Settings.json")
+
         self.GlobalHotkeyBindings = {"start_stop": "f1", "exit": "f3"}
 
         self.WindowAlwaysOnTopEnabled = True
@@ -266,88 +58,85 @@ class AutomatedFishingSystem:
             "y2": int(MonitorHeight * 0.79097)
         }
 
-        self.WaterCastingTargetLocation = None
-
-        self.ProportionalGainCoefficient = 1.4
-        self.DerivativeGainCoefficient = 0.6
-        self.ControlSignalMaximumClamp = 1.0
-        self.MouseHoldDurationForCast = 0.1
-        self.MaximumWaitTimeBeforeRecast = 25.0
-        self.DelayAfterFishCaptured = 0.5
-        self.FishingRodInventorySlot = "1"
-        self.AlternateInventorySlot = "2"
-        self.AutomaticBaitPurchaseEnabled = True
-        self.AutomaticFruitStorageEnabled = False
-        self.AutomaticTopBaitSelectionEnabled = False
-
-        self.OCRReader = None
-        self.TextDetectionEnabled = True
-
-        self.StoreToBackpackEnabled = False
-        self.DevilFruitLocationPoint = None
-        self.DevilFruitStorageFrequencyCounter = 50
-        self.DevilFruitStorageIterationCounter = 0
-
         self.RegionSelectorCurrentlyActive = False
         self.ActiveRegionSelectorInstance = None
 
+        self.WaterCastingTargetLocation = None
         self.ShopLeftButtonLocation = None
         self.ShopCenterButtonLocation = None
         self.ShopRightButtonLocation = None
         self.FruitStorageButtonLocation = None
+        self.DevilFruitLocationPoint = None
         self.BaitSelectionButtonLocation = None
-
-        self.BaitPurchaseFrequencyCounter = 100
-        self.DevilFruitInventorySlots = ["3"]
-
-        self.RobloxWindowFocusInitialDelay = 0.2
-        self.RobloxWindowFocusFollowupDelay = 0.2
-        self.PreCastDialogOpenDelay = 1.25
-        self.PreCastMouseClickDelay = 0.5
-        self.PreCastKeyboardInputDelay = 0.25
-        self.PreCastAntiDetectionDelay = 0.05
-        self.FruitStorageHotkeyActivationDelay = 1.0
-        self.FruitStorageClickConfirmationDelay = 2.0
-        self.FruitStorageShiftKeyPressDelay = 0.5
-        self.FruitStorageBackspaceDeletionDelay = 1.5
-        self.BaitSelectionConfirmationDelay = 0.5
-        self.BlackScreenDetectionRatioThreshold = 0.5
-        self.AntiMacroDialogSpamDelay = 0.25
-        self.InventorySlotSwitchingDelay = 0.2
-        self.MouseMovementAntiDetectionDelay = 0.05
-        self.ImageProcessingLoopDelay = 0.1
-        self.PDControllerApproachingStateDamping = 2.0
-        self.PDControllerChasingStateDamping = 0.5
-        self.BarGroupingGapToleranceMultiplier = 2.0
-        self.InputStateResendFrequency = 0.5
-
-        self.MacroCurrentlyExecuting = False
-        self.CurrentlyRebindingHotkey = None
-        self.MouseButtonCurrentlyPressed = False
-        self.PreviousControlLoopErrorValue = None
-        self.PreviousTargetBarVerticalPosition = None
-        self.LastImageScanTimestamp = time.time()
-        self.LastControlStateChangeTimestamp = time.time()
-        self.LastInputResendTimestamp = time.time()
-        self.RobloxWindowAlreadyFocused = False
-        self.BaitPurchaseIterationCounter = 0
-
-        self.TotalFishSuccessfullyCaught = 0
-        self.CumulativeRunningTimeSeconds = 0
-        self.CurrentSessionBeginTimestamp = None
-        self.MostRecentFishCaptureTimestamp = None
-
-        self.MouseEventListenerInstance = None
-        self.CurrentlySettingPointName = None
-
-        self.AutomaticBaitCraftingEnabled = False
         self.CraftLeftButtonLocation = None
         self.CraftMiddleButtonLocation = None
         self.CraftButtonLocation = None
         self.CloseMenuButtonLocation = None
+        self.AddRecipeButtonLocation = None
+        self.TopRecipeSlotLocation = None
 
+        self.FishingRodInventorySlot = "1"
+        self.AlternateInventorySlot = "2"
+        self.DevilFruitInventorySlots = ["3"]
+
+        self.AutomaticBaitPurchaseEnabled = True
+        self.AutomaticBaitCraftingEnabled = False
+        self.AutomaticFruitStorageEnabled = False
+        self.AutomaticTopBaitSelectionEnabled = False
+
+        self.StoreToBackpackEnabled = False
+        self.LogDevilFruitEnabled = False
+        self.WebhookUrl = ""
+
+        self.OCRReader = None
+        self.TextDetectionEnabled = True
+
+        self.BaitPurchaseFrequencyCounter = 100
+        self.BaitPurchaseIterationCounter = 0
+        self.DevilFruitStorageFrequencyCounter = 50
+        self.DevilFruitStorageIterationCounter = 0
         self.FishCountPerCraft = 50
         self.FishCountSinceLastCraft = 0
+        self.BaitCraftIterationCounter = 0
+        self.CraftsPerCycleCount = 40
+        self.BaitCraftFrequencyCounter = 5
+
+        self.BaitRecipes = []
+        self.CurrentRecipeIndex = 0
+
+        self.ProportionalGainCoefficient = 1.4
+        self.DerivativeGainCoefficient = 0.6
+        self.ControlSignalMaximumClamp = 1.0
+        self.PDControllerApproachingStateDamping = 2.0
+        self.PDControllerChasingStateDamping = 0.5
+        self.BarGroupingGapToleranceMultiplier = 2.0
+
+        self.MouseHoldDurationForCast = 0.1
+        self.MaximumWaitTimeBeforeRecast = 25.0
+        self.DelayAfterFishCaptured = 0.5
+        self.InputStateResendFrequency = 0.5
+
+        self.RobloxWindowFocusInitialDelay = 0.2
+        self.RobloxWindowFocusFollowupDelay = 0.2
+
+        self.PreCastDialogOpenDelay = 1.25
+        self.PreCastMouseClickDelay = 0.5
+        self.PreCastKeyboardInputDelay = 0.25
+        self.PreCastAntiDetectionDelay = 0.05
+
+        self.FruitStorageHotkeyActivationDelay = 1.0
+        self.FruitStorageClickConfirmationDelay = 2.0
+        self.FruitStorageShiftKeyPressDelay = 0.5
+        self.FruitStorageBackspaceDeletionDelay = 1.5
+
+        self.BaitSelectionConfirmationDelay = 0.5
+        self.InventorySlotSwitchingDelay = 0.2
+
+        self.BlackScreenDetectionRatioThreshold = 0.5
+        self.AntiMacroDialogSpamDelay = 0.25
+        self.MouseMovementAntiDetectionDelay = 0.05
+        self.ImageProcessingLoopDelay = 0.1
+
         self.MoveDurationSeconds = 4.25
         self.CraftMenuOpenDelay = 0.85
         self.CraftClickDelay = 0.2
@@ -357,156 +146,203 @@ class AutomatedFishingSystem:
         self.CraftButtonClickDelay = 0.025
         self.CraftCloseMenuDelay = 0.2
 
-        self.BaitCraftIterationCounter = 0
-        self.CurrentRecipeIndex = 0
-        self.BaitRecipes = []
-        
-        self.AddRecipeButtonLocation = None
-        self.TopRecipeSlotLocation = None
-        
-        self.WebhookUrl = ""
-        self.LogDevilFruitEnabled = False
+        self.MacroCurrentlyExecuting = False
+        self.CurrentlyRebindingHotkey = None
+        self.MouseButtonCurrentlyPressed = False
+        self.RobloxWindowAlreadyFocused = False
+
+        self.PreviousControlLoopErrorValue = None
+        self.PreviousTargetBarVerticalPosition = None
+        self.LastImageScanTimestamp = time.time()
+        self.LastControlStateChangeTimestamp = time.time()
+        self.LastInputResendTimestamp = time.time()
+
+        self.TotalFishSuccessfullyCaught = 0
+        self.CumulativeRunningTimeSeconds = 0
+        self.CurrentSessionBeginTimestamp = None
+        self.MostRecentFishCaptureTimestamp = None
+
+        self.MouseEventListenerInstance = None
+        self.CurrentlySettingPointName = None
 
         self.LoadConfigurationFromDisk()
         self.RegisterAllHotkeyBindings()
     
     def LoadConfigurationFromDisk(self):
-        if os.path.exists(self.ConfigurationFilePath):
+        if not os.path.exists(self.ConfigurationFilePath):
+            print(f"No configuration file found at {self.ConfigurationFilePath}. Creating new one with defaults.")
+            self.SaveConfigurationToDisk()
+            return
+        
+        try:
+            with open(self.ConfigurationFilePath, 'r', encoding='utf-8') as ConfigurationFileHandle:
+                FileContent = ConfigurationFileHandle.read().strip()
+            
+            if not FileContent:
+                print(f"Configuration file at {self.ConfigurationFilePath} is empty. Initializing with defaults.")
+                self.SaveConfigurationToDisk()
+                return
+            
             try:
-                with open(self.ConfigurationFilePath, 'r') as ConfigurationFileHandle:
-                    FileContent = ConfigurationFileHandle.read().strip()
+                ParsedConfigurationData = json.loads(FileContent)
+            except json.JSONDecodeError as JsonError:
+                print(f"Configuration file corrupted: {JsonError}")
+                print(f"File location: {self.ConfigurationFilePath}")
+                print("Using defaults. Old file will be backed up.")
                 
-                    if not FileContent:
-                        print("Configuration file is empty. Using defaults.")
-                        ParsedConfigurationData = {}
-                    else:
-                        try:
-                            ParsedConfigurationData = json.loads(FileContent)
-                        except json.JSONDecodeError as JsonError:
-                            print(f"Configuration file corrupted: {JsonError}")
-                            print("Using defaults. Old file backed up.")
-                            try:
-                                BackupPath = self.ConfigurationFilePath + ".backup"
-                                os.rename(self.ConfigurationFilePath, BackupPath)
-                            except:
-                                pass
-                            ParsedConfigurationData = {}
-
-                    self.GlobalHotkeyBindings.update(ParsedConfigurationData.get("Hotkeys", {}))
-                    
-                    WindowSettings = ParsedConfigurationData.get("WindowSettings", {})
-                    self.WindowAlwaysOnTopEnabled = WindowSettings.get("AlwaysOnTop", True)
-                    self.DebugOverlayVisible = WindowSettings.get("ShowDebugOverlay", False)
-                    
-                    self.ScanningRegionBounds.update(ParsedConfigurationData.get("ScanArea", {}))
-                    
-                    ClickPoints = ParsedConfigurationData.get("ClickPoints", {})
-                    self.WaterCastingTargetLocation = ClickPoints.get("WaterPoint", None)
-                    
-                    ShopPoints = ClickPoints.get("Shop", {})
-                    self.ShopLeftButtonLocation = ShopPoints.get("LeftPoint", None)
-                    self.ShopCenterButtonLocation = ShopPoints.get("MiddlePoint", None)
-                    self.ShopRightButtonLocation = ShopPoints.get("RightPoint", None)
-                    
-                    self.BaitSelectionButtonLocation = ClickPoints.get("BaitPoint", None)
-                    
-                    DevilFruitPoints = ClickPoints.get("DevilFruit", {})
-                    self.FruitStorageButtonLocation = DevilFruitPoints.get("StoreFruitPoint", None)
-                    self.DevilFruitLocationPoint = DevilFruitPoints.get("DevilFruitLocationPoint", None)
-                    
-                    CraftingPoints = ClickPoints.get("Crafting", {})
-                    self.CraftLeftButtonLocation = CraftingPoints.get("CraftLeftPoint", None)
-                    self.CraftMiddleButtonLocation = CraftingPoints.get("CraftMiddlePoint", None)
-                    self.CraftButtonLocation = CraftingPoints.get("CraftButtonPoint", None)
-                    self.CloseMenuButtonLocation = CraftingPoints.get("CloseMenuPoint", None)
-                    self.AddRecipeButtonLocation = CraftingPoints.get("AddRecipePoint", None)
-                    self.TopRecipeSlotLocation = CraftingPoints.get("TopRecipePoint", None)
-                    self.BaitRecipes = CraftingPoints.get("BaitRecipes", [])
-                    self.CurrentRecipeIndex = CraftingPoints.get("CurrentRecipeIndex", 0)
-                    
-                    InventoryHotkeys = ParsedConfigurationData.get("InventoryHotkeys", {})
-                    self.FishingRodInventorySlot = InventoryHotkeys.get("RodHotkey", "1")
-                    self.AlternateInventorySlot = InventoryHotkeys.get("AnythingElseHotkey", "2")
-                    self.DevilFruitInventorySlots = InventoryHotkeys.get("DevilFruitHotkey", ["3"])
-                    
-                    Automation = ParsedConfigurationData.get("AutomationFeatures", {})
-                    self.AutomaticBaitPurchaseEnabled = Automation.get("AutoBuyCommonBait", True)
-                    self.AutomaticFruitStorageEnabled = Automation.get("AutoStoreDevilFruit", False)
-                    self.AutomaticTopBaitSelectionEnabled = Automation.get("AutoSelectTopBait", False)
-                    self.AutomaticBaitCraftingEnabled = Automation.get("AutoCraftBait", False)
-                    
-                    Frequencies = ParsedConfigurationData.get("AutomationFrequencies", {})
-                    self.BaitPurchaseFrequencyCounter = Frequencies.get("LoopsPerPurchase", 100)
-                    self.DevilFruitStorageFrequencyCounter = Frequencies.get("LoopsPerStore", 50)
-                    self.BaitCraftFrequencyCounter = Frequencies.get("LoopsPerCraft", 5)
-                    self.CraftsPerCycleCount = Frequencies.get("CraftsPerCycle", 40)
-                    self.FishCountPerCraft = Frequencies.get("FishCountPerCraft", 50)
-                    
-                    DfStorage = ParsedConfigurationData.get("DevilFruitStorage", {})
-                    self.StoreToBackpackEnabled = DfStorage.get("StoreToBackpack", False)
-                    self.LogDevilFruitEnabled = DfStorage.get("LogDevilFruit", False)
-                    self.WebhookUrl = DfStorage.get("WebhookUrl", "")
-                    
-                    FishingControl = ParsedConfigurationData.get("FishingControl", {})
-                    
-                    PdController = FishingControl.get("PdController", {})
-                    self.ProportionalGainCoefficient = PdController.get("Kp", 1.4)
-                    self.DerivativeGainCoefficient = PdController.get("Kd", 0.6)
-                    self.ControlSignalMaximumClamp = PdController.get("PdClamp", 1.0)
-                    self.PDControllerApproachingStateDamping = PdController.get("PdApproachingDamping", 2.0)
-                    self.PDControllerChasingStateDamping = PdController.get("PdChasingDamping", 0.5)
-                    
-                    Timing = FishingControl.get("Timing", {})
-                    self.MouseHoldDurationForCast = Timing.get("CastHoldDuration", 0.1)
-                    self.MaximumWaitTimeBeforeRecast = Timing.get("RecastTimeout", 25.0)
-                    self.DelayAfterFishCaptured = Timing.get("FishEndDelay", 0.5)
-                    self.InputStateResendFrequency = Timing.get("StateResendInterval", 0.5)
-                    
-                    Detection = FishingControl.get("Detection", {})
-                    self.BarGroupingGapToleranceMultiplier = Detection.get("GapToleranceMultiplier", 2.0)
-                    self.BlackScreenDetectionRatioThreshold = Detection.get("BlackScreenThreshold", 0.5)
-                    self.ImageProcessingLoopDelay = Detection.get("ScanLoopDelay", 0.1)
-                    
-                    TimingDelays = ParsedConfigurationData.get("TimingDelays", {})
-                    
-                    RobloxWindow = TimingDelays.get("RobloxWindow", {})
-                    self.RobloxWindowFocusInitialDelay = RobloxWindow.get("RobloxFocusDelay", 0.2)
-                    self.RobloxWindowFocusFollowupDelay = RobloxWindow.get("RobloxPostFocusDelay", 0.2)
-                    
-                    PreCast = TimingDelays.get("PreCast", {})
-                    self.PreCastDialogOpenDelay = PreCast.get("SetPrecastEDelay", 1.25)
-                    self.PreCastMouseClickDelay = PreCast.get("PreCastClickDelay", 0.5)
-                    self.PreCastKeyboardInputDelay = PreCast.get("PreCastTypeDelay", 0.25)
-                    self.PreCastAntiDetectionDelay = PreCast.get("PreCastAntiDetectDelay", 0.05)
-                    
-                    Inventory = TimingDelays.get("Inventory", {})
-                    self.InventorySlotSwitchingDelay = Inventory.get("RodSelectDelay", 0.2)
-                    self.BaitSelectionConfirmationDelay = Inventory.get("AutoSelectBaitDelay", 0.5)
-                    
-                    DfStorageDelays = TimingDelays.get("DevilFruitStorage", {})
-                    self.FruitStorageHotkeyActivationDelay = DfStorageDelays.get("StoreFruitHotkeyDelay", 1.0)
-                    self.FruitStorageClickConfirmationDelay = DfStorageDelays.get("StoreFruitClickDelay", 2.0)
-                    self.FruitStorageShiftKeyPressDelay = DfStorageDelays.get("StoreFruitShiftDelay", 0.5)
-                    self.FruitStorageBackspaceDeletionDelay = DfStorageDelays.get("StoreFruitBackspaceDelay", 1.5)
-                    
-                    AntiDetection = TimingDelays.get("AntiDetection", {})
-                    self.MouseMovementAntiDetectionDelay = AntiDetection.get("CursorAntiDetectDelay", 0.05)
-                    self.AntiMacroDialogSpamDelay = AntiDetection.get("AntiMacroSpamDelay", 0.25)
-                    
-                    CraftingDelays = TimingDelays.get("Crafting", {})
-                    self.MoveDurationSeconds = CraftingDelays.get("MoveDuration", 4.25)
-                    self.CraftMenuOpenDelay = CraftingDelays.get("CraftMenuOpenDelay", 0.85)
-                    self.CraftClickDelay = CraftingDelays.get("CraftClickDelay", 0.2)
-                    self.CraftRecipeSelectDelay = CraftingDelays.get("CraftRecipeSelectDelay", 0.2)
-                    self.CraftAddRecipeDelay = CraftingDelays.get("CraftAddRecipeDelay", 0.2)
-                    self.CraftTopRecipeDelay = CraftingDelays.get("CraftTopRecipeDelay", 0.2)
-                    self.CraftButtonClickDelay = CraftingDelays.get("CraftButtonClickDelay", 0.025)
-                    self.CraftCloseMenuDelay = CraftingDelays.get("CraftCloseMenuDelay", 0.2)
-            except Exception as LoadError:
-                import traceback
-                traceback.print_exc()
-
-    
+                try:
+                    BackupPath = self.ConfigurationFilePath + f".backup_{int(time.time())}"
+                    os.rename(self.ConfigurationFilePath, BackupPath)
+                    print(f"Backup created at: {BackupPath}")
+                except Exception as backup_error:
+                    print(f"Could not create backup: {backup_error}")
+                
+                self.SaveConfigurationToDisk()
+                return
+            
+            if "Hotkeys" in ParsedConfigurationData:
+                self.GlobalHotkeyBindings.update(ParsedConfigurationData["Hotkeys"])
+            
+            if "WindowSettings" in ParsedConfigurationData:
+                WindowSettings = ParsedConfigurationData["WindowSettings"]
+                self.WindowAlwaysOnTopEnabled = WindowSettings.get("AlwaysOnTop", self.WindowAlwaysOnTopEnabled)
+                self.DebugOverlayVisible = WindowSettings.get("ShowDebugOverlay", self.DebugOverlayVisible)
+            
+            if "ScanArea" in ParsedConfigurationData:
+                self.ScanningRegionBounds.update(ParsedConfigurationData["ScanArea"])
+            
+            if "ClickPoints" in ParsedConfigurationData:
+                ClickPoints = ParsedConfigurationData["ClickPoints"]
+                
+                self.WaterCastingTargetLocation = ClickPoints.get("WaterPoint", self.WaterCastingTargetLocation)
+                
+                if "Shop" in ClickPoints:
+                    ShopPoints = ClickPoints["Shop"]
+                    self.ShopLeftButtonLocation = ShopPoints.get("LeftPoint", self.ShopLeftButtonLocation)
+                    self.ShopCenterButtonLocation = ShopPoints.get("MiddlePoint", self.ShopCenterButtonLocation)
+                    self.ShopRightButtonLocation = ShopPoints.get("RightPoint", self.ShopRightButtonLocation)
+                
+                self.BaitSelectionButtonLocation = ClickPoints.get("BaitPoint", self.BaitSelectionButtonLocation)
+                
+                if "DevilFruit" in ClickPoints:
+                    DevilFruitPoints = ClickPoints["DevilFruit"]
+                    self.FruitStorageButtonLocation = DevilFruitPoints.get("StoreFruitPoint", self.FruitStorageButtonLocation)
+                    self.DevilFruitLocationPoint = DevilFruitPoints.get("DevilFruitLocationPoint", self.DevilFruitLocationPoint)
+                
+                if "Crafting" in ClickPoints:
+                    CraftingPoints = ClickPoints["Crafting"]
+                    self.CraftLeftButtonLocation = CraftingPoints.get("CraftLeftPoint", self.CraftLeftButtonLocation)
+                    self.CraftMiddleButtonLocation = CraftingPoints.get("CraftMiddlePoint", self.CraftMiddleButtonLocation)
+                    self.CraftButtonLocation = CraftingPoints.get("CraftButtonPoint", self.CraftButtonLocation)
+                    self.CloseMenuButtonLocation = CraftingPoints.get("CloseMenuPoint", self.CloseMenuButtonLocation)
+                    self.AddRecipeButtonLocation = CraftingPoints.get("AddRecipePoint", self.AddRecipeButtonLocation)
+                    self.TopRecipeSlotLocation = CraftingPoints.get("TopRecipePoint", self.TopRecipeSlotLocation)
+                    self.BaitRecipes = CraftingPoints.get("BaitRecipes", self.BaitRecipes)
+                    self.CurrentRecipeIndex = CraftingPoints.get("CurrentRecipeIndex", self.CurrentRecipeIndex)
+            
+            if "InventoryHotkeys" in ParsedConfigurationData:
+                InventoryHotkeys = ParsedConfigurationData["InventoryHotkeys"]
+                self.FishingRodInventorySlot = InventoryHotkeys.get("RodHotkey", self.FishingRodInventorySlot)
+                self.AlternateInventorySlot = InventoryHotkeys.get("AnythingElseHotkey", self.AlternateInventorySlot)
+                self.DevilFruitInventorySlots = InventoryHotkeys.get("DevilFruitHotkeys", self.DevilFruitInventorySlots)
+            
+            if "AutomationFeatures" in ParsedConfigurationData:
+                Automation = ParsedConfigurationData["AutomationFeatures"]
+                self.AutomaticBaitPurchaseEnabled = Automation.get("AutoBuyCommonBait", self.AutomaticBaitPurchaseEnabled)
+                self.AutomaticFruitStorageEnabled = Automation.get("AutoStoreDevilFruit", self.AutomaticFruitStorageEnabled)
+                self.AutomaticTopBaitSelectionEnabled = Automation.get("AutoSelectTopBait", self.AutomaticTopBaitSelectionEnabled)
+                self.AutomaticBaitCraftingEnabled = Automation.get("AutoCraftBait", self.AutomaticBaitCraftingEnabled)
+            
+            if "AutomationFrequencies" in ParsedConfigurationData:
+                Frequencies = ParsedConfigurationData["AutomationFrequencies"]
+                self.BaitPurchaseFrequencyCounter = Frequencies.get("LoopsPerPurchase", self.BaitPurchaseFrequencyCounter)
+                self.DevilFruitStorageFrequencyCounter = Frequencies.get("LoopsPerStore", self.DevilFruitStorageFrequencyCounter)
+                self.BaitCraftFrequencyCounter = Frequencies.get("LoopsPerCraft", getattr(self, 'BaitCraftFrequencyCounter', 5))
+                self.CraftsPerCycleCount = Frequencies.get("CraftsPerCycle", getattr(self, 'CraftsPerCycleCount', 40))
+                self.FishCountPerCraft = Frequencies.get("FishCountPerCraft", self.FishCountPerCraft)
+            
+            if "DevilFruitStorage" in ParsedConfigurationData:
+                DfStorage = ParsedConfigurationData["DevilFruitStorage"]
+                self.StoreToBackpackEnabled = DfStorage.get("StoreToBackpack", self.StoreToBackpackEnabled)
+                self.LogDevilFruitEnabled = DfStorage.get("LogDevilFruit", self.LogDevilFruitEnabled)
+                self.WebhookUrl = DfStorage.get("WebhookUrl", self.WebhookUrl)
+            
+            if "FishingControl" in ParsedConfigurationData:
+                FishingControl = ParsedConfigurationData["FishingControl"]
+                
+                if "PdController" in FishingControl:
+                    PdController = FishingControl["PdController"]
+                    self.ProportionalGainCoefficient = PdController.get("Kp", self.ProportionalGainCoefficient)
+                    self.DerivativeGainCoefficient = PdController.get("Kd", self.DerivativeGainCoefficient)
+                    self.ControlSignalMaximumClamp = PdController.get("PdClamp", self.ControlSignalMaximumClamp)
+                    self.PDControllerApproachingStateDamping = PdController.get("PdApproachingDamping", self.PDControllerApproachingStateDamping)
+                    self.PDControllerChasingStateDamping = PdController.get("PdChasingDamping", self.PDControllerChasingStateDamping)
+                
+                if "Timing" in FishingControl:
+                    Timing = FishingControl["Timing"]
+                    self.MouseHoldDurationForCast = Timing.get("CastHoldDuration", self.MouseHoldDurationForCast)
+                    self.MaximumWaitTimeBeforeRecast = Timing.get("RecastTimeout", self.MaximumWaitTimeBeforeRecast)
+                    self.DelayAfterFishCaptured = Timing.get("FishEndDelay", self.DelayAfterFishCaptured)
+                    self.InputStateResendFrequency = Timing.get("StateResendInterval", self.InputStateResendFrequency)
+                
+                if "Detection" in FishingControl:
+                    Detection = FishingControl["Detection"]
+                    self.BarGroupingGapToleranceMultiplier = Detection.get("GapToleranceMultiplier", self.BarGroupingGapToleranceMultiplier)
+                    self.BlackScreenDetectionRatioThreshold = Detection.get("BlackScreenThreshold", self.BlackScreenDetectionRatioThreshold)
+                    self.ImageProcessingLoopDelay = Detection.get("ScanLoopDelay", self.ImageProcessingLoopDelay)
+            
+            if "TimingDelays" in ParsedConfigurationData:
+                TimingDelays = ParsedConfigurationData["TimingDelays"]
+                
+                if "RobloxWindow" in TimingDelays:
+                    RobloxWindow = TimingDelays["RobloxWindow"]
+                    self.RobloxWindowFocusInitialDelay = RobloxWindow.get("RobloxFocusDelay", self.RobloxWindowFocusInitialDelay)
+                    self.RobloxWindowFocusFollowupDelay = RobloxWindow.get("RobloxPostFocusDelay", self.RobloxWindowFocusFollowupDelay)
+                
+                if "PreCast" in TimingDelays:
+                    PreCast = TimingDelays["PreCast"]
+                    self.PreCastDialogOpenDelay = PreCast.get("SetPrecastEDelay", self.PreCastDialogOpenDelay)
+                    self.PreCastMouseClickDelay = PreCast.get("PreCastClickDelay", self.PreCastMouseClickDelay)
+                    self.PreCastKeyboardInputDelay = PreCast.get("PreCastTypeDelay", self.PreCastKeyboardInputDelay)
+                    self.PreCastAntiDetectionDelay = PreCast.get("PreCastAntiDetectDelay", self.PreCastAntiDetectionDelay)
+                
+                if "Inventory" in TimingDelays:
+                    Inventory = TimingDelays["Inventory"]
+                    self.InventorySlotSwitchingDelay = Inventory.get("RodSelectDelay", self.InventorySlotSwitchingDelay)
+                    self.BaitSelectionConfirmationDelay = Inventory.get("AutoSelectBaitDelay", self.BaitSelectionConfirmationDelay)
+                
+                if "DevilFruitStorage" in TimingDelays:
+                    DfStorageDelays = TimingDelays["DevilFruitStorage"]
+                    self.FruitStorageHotkeyActivationDelay = DfStorageDelays.get("StoreFruitHotkeyDelay", self.FruitStorageHotkeyActivationDelay)
+                    self.FruitStorageClickConfirmationDelay = DfStorageDelays.get("StoreFruitClickDelay", self.FruitStorageClickConfirmationDelay)
+                    self.FruitStorageShiftKeyPressDelay = DfStorageDelays.get("StoreFruitShiftDelay", self.FruitStorageShiftKeyPressDelay)
+                    self.FruitStorageBackspaceDeletionDelay = DfStorageDelays.get("StoreFruitBackspaceDelay", self.FruitStorageBackspaceDeletionDelay)
+                
+                if "AntiDetection" in TimingDelays:
+                    AntiDetection = TimingDelays["AntiDetection"]
+                    self.MouseMovementAntiDetectionDelay = AntiDetection.get("CursorAntiDetectDelay", self.MouseMovementAntiDetectionDelay)
+                    self.AntiMacroDialogSpamDelay = AntiDetection.get("AntiMacroSpamDelay", self.AntiMacroDialogSpamDelay)
+                
+                if "Crafting" in TimingDelays:
+                    CraftingDelays = TimingDelays["Crafting"]
+                    self.MoveDurationSeconds = CraftingDelays.get("MoveDuration", self.MoveDurationSeconds)
+                    self.CraftMenuOpenDelay = CraftingDelays.get("CraftMenuOpenDelay", self.CraftMenuOpenDelay)
+                    self.CraftClickDelay = CraftingDelays.get("CraftClickDelay", self.CraftClickDelay)
+                    self.CraftRecipeSelectDelay = CraftingDelays.get("CraftRecipeSelectDelay", self.CraftRecipeSelectDelay)
+                    self.CraftAddRecipeDelay = CraftingDelays.get("CraftAddRecipeDelay", self.CraftAddRecipeDelay)
+                    self.CraftTopRecipeDelay = CraftingDelays.get("CraftTopRecipeDelay", self.CraftTopRecipeDelay)
+                    self.CraftButtonClickDelay = CraftingDelays.get("CraftButtonClickDelay", self.CraftButtonClickDelay)
+                    self.CraftCloseMenuDelay = CraftingDelays.get("CraftCloseMenuDelay", self.CraftCloseMenuDelay)
+            
+            print(f"Configuration loaded successfully from {self.ConfigurationFilePath}")
+            
+        except Exception as LoadError:
+            print(f"Error loading configuration: {LoadError}")
+            print(f"File location: {self.ConfigurationFilePath}")
+            import traceback
+            traceback.print_exc()
+            print("Using default values.")
+            
     def SaveConfigurationToDisk(self):
         try:
             with open(self.ConfigurationFilePath, 'w') as ConfigurationFileHandle:
@@ -932,7 +768,6 @@ class AutomatedFishingSystem:
                     keyboard.press_and_release('shift')
                     time.sleep(0.1)
                     if not self.MacroCurrentlyExecuting: return False
-                time.sleep(2)
                 keyboard.press_and_release('t')
                 time.sleep(self.CraftMenuOpenDelay)
                 if not self.MacroCurrentlyExecuting: return False
@@ -1619,6 +1454,221 @@ class AutomatedFishingSystem:
             "baitRecipes": self.BaitRecipes,
             "currentRecipeIndex": self.CurrentRecipeIndex,
         }
+
+class RegionSelectionWindow:
+    def __init__(self, ParentWindow, InitialBoundingBox, CompletionCallback):
+        self.CompletionCallback = CompletionCallback
+        self.ParentWindow = ParentWindow
+        self.IsWindowClosed = False
+
+        self.RootWindow = tk.Tk()
+        self.RootWindow.attributes('-alpha', 0.85)
+        self.RootWindow.attributes('-topmost', True)
+        self.RootWindow.overrideredirect(True)
+
+        self.LeftBoundary, self.TopBoundary = InitialBoundingBox["x1"], InitialBoundingBox["y1"]
+        self.RightBoundary, self.BottomBoundary = InitialBoundingBox["x2"], InitialBoundingBox["y2"]
+
+        WindowWidth = self.RightBoundary - self.LeftBoundary
+        WindowHeight = self.BottomBoundary - self.TopBoundary
+
+        self.RootWindow.geometry(f"{WindowWidth}x{WindowHeight}+{self.LeftBoundary}+{self.TopBoundary}")
+        self.RootWindow.configure(bg='#1e293b')
+
+        HeaderFrame = tk.Frame(self.RootWindow, bg='#0f172a', height=40)
+        HeaderFrame.pack(side='top', fill='x')
+        HeaderFrame.pack_propagate(False)
+
+        TitleLabel = tk.Label(
+            HeaderFrame,
+            text="📐 Select Region",
+            bg='#0f172a',
+            fg='#e2e8f0',
+            font=('Segoe UI', 10, 'bold'),
+            padx=15
+        )
+        TitleLabel.pack(side='left', pady=10)
+
+        ButtonContainer = tk.Frame(HeaderFrame, bg='#0f172a')
+        ButtonContainer.pack(side='right', padx=10, pady=5)
+
+        self.ConfirmButton = tk.Button(
+            ButtonContainer,
+            text="✓ Confirm",
+            command=self.CloseWindow,
+            bg='#10b981',
+            fg='white',
+            font=('Segoe UI', 9, 'bold'),
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            relief='flat',
+            borderwidth=0,
+            activebackground='#059669',
+            activeforeground='white'
+        )
+        self.ConfirmButton.pack(side='right')
+
+        self.ConfirmButton.bind('<Enter>', lambda e: self.ConfirmButton.config(bg='#059669'))
+        self.ConfirmButton.bind('<Leave>', lambda e: self.ConfirmButton.config(bg='#10b981'))
+
+        self.DrawingCanvas = tk.Canvas(
+            self.RootWindow,
+            bg='#1e293b',
+            highlightthickness=2,
+            highlightbackground='#3b82f6',
+            relief='flat'
+        )
+        self.DrawingCanvas.pack(fill='both', expand=True, padx=2, pady=2)
+
+        self.CreateCornerIndicators()
+
+        self.IsDraggingWindow = False
+        self.IsResizingWindow = False
+        self.ActiveResizeEdge = None
+
+        self.MouseDownPositionX = 0
+        self.MouseDownPositionY = 0
+        self.EdgeDetectionThreshold = 10
+
+        self.DrawingCanvas.bind('<Button-1>', self.HandleMousePress)
+        self.DrawingCanvas.bind('<B1-Motion>', self.HandleMouseDragMotion)
+        self.DrawingCanvas.bind('<ButtonRelease-1>', self.HandleMouseRelease)
+        self.DrawingCanvas.bind('<Motion>', self.HandleMouseHover)
+        
+        self.RootWindow.protocol("WM_DELETE_WINDOW", self.CloseWindow)
+        
+        self.RootWindow.mainloop()
+
+    def CreateCornerIndicators(self):
+        corner_size = 15
+        corner_color = '#3b82f6'
+        
+        self.RootWindow.update_idletasks()
+        canvas_width = self.DrawingCanvas.winfo_width()
+        canvas_height = self.DrawingCanvas.winfo_height()
+        
+        self.DrawingCanvas.create_rectangle(0, 0, corner_size, corner_size, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 0, 
+                                        canvas_width, corner_size, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(0, canvas_height - corner_size, 
+                                        corner_size, canvas_height, 
+                                        fill=corner_color, outline='')
+        
+        self.DrawingCanvas.create_rectangle(canvas_width - corner_size, 
+                                        canvas_height - corner_size, 
+                                        canvas_width, canvas_height, 
+                                        fill=corner_color, outline='')
+
+    def HandleMouseHover(self, EventData):
+        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
+        CurrentWindowWidth = self.RootWindow.winfo_width()
+        CurrentWindowHeight = self.RootWindow.winfo_height()
+        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
+        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
+        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
+        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
+
+        if IsNearLeftEdge and IsNearTopEdge:
+            self.DrawingCanvas.config(cursor='top_left_corner')
+        elif IsNearRightEdge and IsNearTopEdge:
+            self.DrawingCanvas.config(cursor='top_right_corner')
+        elif IsNearLeftEdge and IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='bottom_left_corner')
+        elif IsNearRightEdge and IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='bottom_right_corner')
+        elif IsNearLeftEdge or IsNearRightEdge:
+            self.DrawingCanvas.config(cursor='sb_h_double_arrow')
+        elif IsNearTopEdge or IsNearBottomEdge:
+            self.DrawingCanvas.config(cursor='sb_v_double_arrow')
+        else:
+            self.DrawingCanvas.config(cursor='fleur')
+
+    def HandleMousePress(self, EventData):
+        self.MouseDownPositionX = EventData.x
+        self.MouseDownPositionY = EventData.y
+        CurrentMouseX, CurrentMouseY = EventData.x, EventData.y
+        CurrentWindowWidth = self.RootWindow.winfo_width()
+        CurrentWindowHeight = self.RootWindow.winfo_height()
+        IsNearLeftEdge = CurrentMouseX < self.EdgeDetectionThreshold
+        IsNearRightEdge = CurrentMouseX > CurrentWindowWidth - self.EdgeDetectionThreshold
+        IsNearTopEdge = CurrentMouseY < self.EdgeDetectionThreshold
+        IsNearBottomEdge = CurrentMouseY > CurrentWindowHeight - self.EdgeDetectionThreshold
+
+        if IsNearLeftEdge or IsNearRightEdge or IsNearTopEdge or IsNearBottomEdge:
+            self.IsResizingWindow = True
+            self.ActiveResizeEdge = {'left': IsNearLeftEdge, 'right': IsNearRightEdge, 'top': IsNearTopEdge, 'bottom': IsNearBottomEdge}
+        else:
+            self.IsDraggingWindow = True
+
+    def HandleMouseDragMotion(self, EventData):
+        if self.IsDraggingWindow:
+            HorizontalDelta = EventData.x - self.MouseDownPositionX
+            VerticalDelta = EventData.y - self.MouseDownPositionY
+            UpdatedWindowX = self.RootWindow.winfo_x() + HorizontalDelta
+            UpdatedWindowY = self.RootWindow.winfo_y() + VerticalDelta
+            self.RootWindow.geometry(f"+{UpdatedWindowX}+{UpdatedWindowY}")
+        elif self.IsResizingWindow:
+            CurrentWindowX = self.RootWindow.winfo_x()
+            CurrentWindowY = self.RootWindow.winfo_y()
+            CurrentWindowWidth = self.RootWindow.winfo_width()
+            CurrentWindowHeight = self.RootWindow.winfo_height()
+            UpdatedWindowX = CurrentWindowX
+            UpdatedWindowY = CurrentWindowY
+            UpdatedWindowWidth = CurrentWindowWidth
+            UpdatedWindowHeight = CurrentWindowHeight
+
+            if self.ActiveResizeEdge['left']:
+                HorizontalDelta = EventData.x - self.MouseDownPositionX
+                UpdatedWindowX = CurrentWindowX + HorizontalDelta
+                UpdatedWindowWidth = CurrentWindowWidth - HorizontalDelta
+            elif self.ActiveResizeEdge['right']:
+                UpdatedWindowWidth = EventData.x
+
+            if self.ActiveResizeEdge['top']:
+                VerticalDelta = EventData.y - self.MouseDownPositionY
+                UpdatedWindowY = CurrentWindowY + VerticalDelta
+                UpdatedWindowHeight = CurrentWindowHeight - VerticalDelta
+            elif self.ActiveResizeEdge['bottom']:
+                UpdatedWindowHeight = EventData.y
+
+            if UpdatedWindowWidth < 50:
+                UpdatedWindowWidth = 50
+                UpdatedWindowX = CurrentWindowX
+            if UpdatedWindowHeight < 50:
+                UpdatedWindowHeight = 50
+                UpdatedWindowY = CurrentWindowY
+
+            self.RootWindow.geometry(f"{UpdatedWindowWidth}x{UpdatedWindowHeight}+{UpdatedWindowX}+{UpdatedWindowY}")
+
+    def HandleMouseRelease(self, EventData):
+        self.IsDraggingWindow = False
+        self.IsResizingWindow = False
+        self.ActiveResizeEdge = None
+
+    def CloseWindow(self):
+        if self.IsWindowClosed:
+            return
+        self.IsWindowClosed = True
+        
+        try:
+            FinalLeftBoundary = self.RootWindow.winfo_x()
+            FinalTopBoundary = self.RootWindow.winfo_y()
+            FinalRightBoundary = FinalLeftBoundary + self.RootWindow.winfo_width()
+            FinalBottomBoundary = FinalTopBoundary + self.RootWindow.winfo_height()
+            FinalCoordinates = {"x1": FinalLeftBoundary, "y1": FinalTopBoundary, "x2": FinalRightBoundary, "y2": FinalBottomBoundary}
+            
+            self.RootWindow.quit()
+            self.RootWindow.destroy()
+            
+            if self.CompletionCallback:
+                self.CompletionCallback(FinalCoordinates)
+        except Exception as ErrorDetails:
+            print(f"Error closing area selector: {ErrorDetails}")
 
 MacroSystemInstance = AutomatedFishingSystem()
 
