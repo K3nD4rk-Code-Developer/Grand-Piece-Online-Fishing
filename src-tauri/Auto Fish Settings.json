@@ -4,19 +4,19 @@
         "exit": "f3"
     },
     "WindowSettings": {
-        "AlwaysOnTop": false,
+        "AlwaysOnTop": true,
         "ShowDebugOverlay": true
     },
     "ScanArea": {
-        "x1": 1296,
-        "y1": 499,
-        "x2": 1713,
-        "y2": 1121
+        "x1": 1273,
+        "y1": 464,
+        "x2": 1711,
+        "y2": 1111
     },
     "ClickPoints": {
         "WaterPoint": {
-            "x": 1138,
-            "y": 333
+            "x": 1349,
+            "y": 327
         },
         "Shop": {
             "LeftPoint": {
@@ -74,8 +74,8 @@
             "BaitRecipes": [
                 {
                     "BaitRecipePoint": {
-                        "x": 1034,
-                        "y": 801
+                        "x": 1022,
+                        "y": 765
                     },
                     "CraftsPerCycle": 40,
                     "SwitchFishCycle": 5
@@ -99,10 +99,10 @@
         ]
     },
     "AutomationFeatures": {
-        "AutoBuyCommonBait": false,
-        "AutoStoreDevilFruit": true,
+        "AutoBuyCommonBait": true,
+        "AutoStoreDevilFruit": false,
         "AutoSelectTopBait": false,
-        "AutoCraftBait": true
+        "AutoCraftBait": false
     },
     "AutomationFrequencies": {
         "LoopsPerPurchase": 100,

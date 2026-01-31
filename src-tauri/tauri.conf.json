@@ -11,8 +11,8 @@
     "windows": [
       {
         "title": "GPO Fish Macro",
-        "width": 700,
-        "height": 600,
+        "width": 900,
+        "height": 675,
         "resizable": true,
         "label": "main"
       },

@@ -19,6 +19,7 @@ from datetime import datetime
 from difflib import get_close_matches
 import re
 import sys
+from ctypes import wintypes
 
 pyautogui.PAUSE = 0
 
@@ -36,6 +37,13 @@ CORS(FlaskApplication)
 class AutomatedFishingSystem:
     def __init__(self):
         SystemDisplayMetrics = ctypes.windll.user32
+        try:
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            handle = kernel32.GetCurrentProcess()
+            kernel32.SetPriorityClass(handle, 0x00000100)
+        except Exception as e:
+            print(f"Could not set process priority: {e}")
+            
         MonitorWidth = SystemDisplayMetrics.GetSystemMetrics(0)
         MonitorHeight = SystemDisplayMetrics.GetSystemMetrics(1)
 
@@ -665,9 +673,13 @@ class AutomatedFishingSystem:
             self.MouseEventListenerInstance.stop()
         
         self.CurrentlySettingPointName = AttributeNameToSet
+        PointSelectionStartTime = time.time()
         
         def ProcessMouseClickEvent(ClickPositionX, ClickPositionY, ButtonPressed, IsPressed):
             if IsPressed and self.CurrentlySettingPointName == AttributeNameToSet:
+                if time.time() - PointSelectionStartTime < 0.25:
+                    return True
+                
                 setattr(self, AttributeNameToSet, {"x": ClickPositionX, "y": ClickPositionY})
                 self.SaveConfigurationToDisk()
                 self.CurrentlySettingPointName = None
@@ -1008,6 +1020,8 @@ class AutomatedFishingSystem:
                         if not self.MacroCurrentlyExecuting: return False
                         
                         if InitGreenDetected:
+                            time.sleep(self.FruitStorageClickConfirmationDelay)
+                            print("checking now.")
                             if not self.DetectGreenishColor(self.FruitStorageButtonLocation) and self.WebhookUrl:
                                 DetectedFruitName = None
                                 if self.TextDetectionEnabled:
@@ -1162,7 +1176,7 @@ class AutomatedFishingSystem:
         
         return BlackPixelRatio >= self.BlackScreenDetectionRatioThreshold
     
-    def DetectGreenishColor(self, TargetPoint, ToleranceRadius=15):
+    def DetectGreenishColor(self, TargetPoint, ToleranceRadius=20):
         if not TargetPoint:
             return False
         
@@ -1181,30 +1195,17 @@ class AutomatedFishingSystem:
             RedChannel = ScreenImageArray[:, :, 2]
             BlueChannel = ScreenImageArray[:, :, 0]
             
-            WhiteMask = (
-                (RedChannel > 200) & 
-                (GreenChannel > 200) & 
-                (BlueChannel > 200) &
-                (np.abs(RedChannel - GreenChannel) < 30) &
-                (np.abs(GreenChannel - BlueChannel) < 30)
-            )
-            
             GreenishMask = (
-                (GreenChannel > RedChannel + 30) &
-                (GreenChannel > BlueChannel + 30) &
-                (GreenChannel > 100) &
-                ~WhiteMask
+                (GreenChannel > RedChannel + 20) & 
+                (GreenChannel > BlueChannel + 20) &
+                (GreenChannel > 80)
             )
             
             GreenPixelCount = np.sum(GreenishMask)
-            NonWhitePixels = np.sum(~WhiteMask)
+            TotalPixels = ScreenImageArray.shape[0] * ScreenImageArray.shape[1]
+            GreenRatio = GreenPixelCount / TotalPixels
             
-            if NonWhitePixels == 0:
-                return False
-            
-            GreenRatio = GreenPixelCount / NonWhitePixels
-            
-            return GreenRatio > 0.20
+            return GreenRatio > 0.10
             
         except Exception as e:
             print(f"Error detecting green color: {e}")
