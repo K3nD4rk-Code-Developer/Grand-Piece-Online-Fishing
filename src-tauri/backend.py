@@ -38,10 +38,24 @@ CORS(FlaskApplication)
 class AutomatedFishingSystem:
     def __init__(self):
         SystemDisplayMetrics = ctypes.windll.user32
+
         try:
-            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-            handle = kernel32.GetCurrentProcess()
-            kernel32.SetPriorityClass(handle, 0x00000100)
+            kernel32 = ctypes.windll.kernel32
+            
+            PROCESS_SET_INFORMATION = 0x0200
+            pid = os.getpid()
+            handle = kernel32.OpenProcess(PROCESS_SET_INFORMATION, False, pid)
+            
+            if handle:
+                result = kernel32.SetPriorityClass(handle, 0x00000080)
+                kernel32.CloseHandle(handle)
+                
+                if not result:
+                    error_code = ctypes.get_last_error()
+                    print(f"Failed to set priority. Error: {error_code}")
+            else:
+                print("Failed to open process handle")
+                
         except Exception as e:
             print(f"Could not set process priority: {e}")
             
@@ -96,6 +110,16 @@ class AutomatedFishingSystem:
         self.StoreToBackpackEnabled = False
         self.LogDevilFruitEnabled = False
         self.WebhookUrl = ""
+
+        self.LogRecastTimeouts = True
+        self.LogPeriodicStats = True
+        self.LogGeneralUpdates = True
+        self.PeriodicStatsIntervalMinutes = 5
+
+        self.TotalRecastTimeouts = 0
+        self.ConsecutiveRecastTimeouts = 0
+        self.LastPeriodicStatsTimestamp = None
+        self.FishCaughtAtLastPeriodicStats = 0
 
         self.OCRReader = None
         self.TextDetectionEnabled = True
@@ -219,6 +243,13 @@ class AutomatedFishingSystem:
             
             if "ScanArea" in ParsedConfigurationData:
                 self.ScanningRegionBounds.update(ParsedConfigurationData["ScanArea"])
+
+            if "LoggingOptions" in ParsedConfigurationData:
+                LogOpts = ParsedConfigurationData["LoggingOptions"]
+                self.LogRecastTimeouts = LogOpts.get("LogRecastTimeouts", self.LogRecastTimeouts)
+                self.LogPeriodicStats = LogOpts.get("LogPeriodicStats", self.LogPeriodicStats)
+                self.LogGeneralUpdates = LogOpts.get("LogGeneralUpdates", self.LogGeneralUpdates)
+                self.PeriodicStatsIntervalMinutes = LogOpts.get("PeriodicStatsIntervalMinutes", self.PeriodicStatsIntervalMinutes)
             
             if "ClickPoints" in ParsedConfigurationData:
                 ClickPoints = ParsedConfigurationData["ClickPoints"]
@@ -408,6 +439,12 @@ class AutomatedFishingSystem:
                         "LogDevilFruit": self.LogDevilFruitEnabled,
                         "WebhookUrl": self.WebhookUrl
                     },
+                    "LoggingOptions": {
+                        "LogRecastTimeouts": self.LogRecastTimeouts,
+                        "LogPeriodicStats": self.LogPeriodicStats,
+                        "LogGeneralUpdates": self.LogGeneralUpdates,
+                        "PeriodicStatsIntervalMinutes": self.PeriodicStatsIntervalMinutes
+                    },
                     "FishingControl": {
                         "PdController": {
                             "Kp": self.ProportionalGainCoefficient,
@@ -471,12 +508,10 @@ class AutomatedFishingSystem:
     def InitializeOCR(self):
         if self.OCRReader is None and self.TextDetectionEnabled:
             try:
-                print("Initializing OCR In Background...")
                 def LoadOCRInBackground():
                     try:
                         import easyocr
                         self.OCRReader = easyocr.Reader(['en'], gpu=False, verbose=False)
-                        print("OCR Initialized Successfully!")
                     except Exception as OCRInitError:
                         print(f"OCR Initialization Error: {OCRInitError}")
                         self.TextDetectionEnabled = False
@@ -524,35 +559,26 @@ class AutomatedFishingSystem:
             try:
                 from PIL import Image as PILImage
                 DebugImage = PILImage.frombytes('RGB', ScreenshotData.size, ScreenshotData.rgb)
-                DebugImage.save("ocr_debug_scan.png")
-                print("Debug Image Saved: ocr_debug_scan.png")
             except Exception as SaveError:
                 print(f"Could Not Save Debug Image: {SaveError}")
 
             ImageRGB = Image[:, :, [2, 1, 0]]
             
-            print("Running OCR...")
             Results = self.OCRReader.readtext(ImageRGB, detail=1, paragraph=False)
             
-            print(f"OCR Found {len(Results)} Text Blocks")
-
             FullText = ""
             for Index, (BBox, Text, Confidence) in enumerate(Results):
-                print(f"  Block {Index + 1}: '{Text}' (Confidence: {Confidence:.2f})")
                 if Confidence > 0.2:
                     FullText += Text + " "
             
             FullText = FullText.strip()
-            print(f"Combined Text: '{FullText}'")
 
             if FullText and ("new" in FullText.lower() or "nev" in FullText.lower()):
                 if "item" in FullText.lower():
-                    print(f"Found 'New Item' In Text!")
                     
                     BracketMatch = re.search(r'<([^>]+)>', FullText, re.IGNORECASE)
                     if BracketMatch:
                         ItemName = BracketMatch.group(1).strip()
-                        print(f"✅ Extracted Fruit Name: {ItemName}")
                         return ItemName
                     
                     AfterItemMatch = re.search(r'item\s+(.+)', FullText, re.IGNORECASE)
@@ -560,14 +586,10 @@ class AutomatedFishingSystem:
                         ItemName = AfterItemMatch.group(1).strip()
                         ItemName = ItemName.replace('<', '').replace('>', '').strip()
                         if ItemName:
-                            print(f"✅ Extracted Fruit Name (No Brackets): {ItemName}")
                             return ItemName
                     
-                    print(f"⚠️ Could Not Extract Name, Returning Full Text")
                     return FullText
-            else:
-                print("❌ No 'New Item' Text Found")
-            
+                            
             return None
             
         except Exception as OCRCheckError:
@@ -589,6 +611,11 @@ class AutomatedFishingSystem:
         if self.MacroCurrentlyExecuting:
             self.CurrentSessionBeginTimestamp = time.time()
             self.RobloxWindowAlreadyFocused = False
+            self.ConsecutiveRecastTimeouts = 0
+            self.LastPeriodicStatsTimestamp = time.time()
+            self.FishCaughtAtLastPeriodicStats = self.TotalFishSuccessfullyCaught
+            if self.WebhookUrl and self.LogGeneralUpdates:
+                self.SendWebhookNotification("Macro started.")
             threading.Thread(target=self.ExecutePrimaryMacroLoop, daemon=True).start()
         else:
             if self.CurrentSessionBeginTimestamp:
@@ -597,6 +624,8 @@ class AutomatedFishingSystem:
             if self.MouseButtonCurrentlyPressed:
                 pyautogui.mouseUp()
                 self.MouseButtonCurrentlyPressed = False
+            if self.WebhookUrl and self.LogGeneralUpdates:
+                self.SendWebhookNotification(f"Macro stopped. Fish this session: {self.TotalFishSuccessfullyCaught}")
     
     def ModifyScanningRegion(self):
         if self.RegionSelectorCurrentlyActive:
@@ -626,6 +655,42 @@ class AutomatedFishingSystem:
     
     def TerminateApplicationImmediately(self):
         os._exit(0)
+
+    def HandleRecastTimeout(self):
+        self.TotalRecastTimeouts += 1
+        self.ConsecutiveRecastTimeouts += 1
+        if not self.WebhookUrl or not self.LogRecastTimeouts:
+            return
+        if self.ConsecutiveRecastTimeouts == 3:
+            self.SendWebhookNotification(f"3 consecutive recast timeouts ({self.MaximumWaitTimeBeforeRecast}s). Total: {self.TotalRecastTimeouts}")
+        elif self.ConsecutiveRecastTimeouts == 10:
+            self.SendWebhookNotification(f"10 consecutive recast timeouts — macro may be stuck. Total: {self.TotalRecastTimeouts}")
+        elif self.ConsecutiveRecastTimeouts > 10 and self.ConsecutiveRecastTimeouts % 10 == 0:
+            self.SendWebhookNotification(f"{self.ConsecutiveRecastTimeouts} consecutive timeouts. Total: {self.TotalRecastTimeouts}")
+
+    def CheckPeriodicStats(self):
+        if not self.WebhookUrl or not self.LogPeriodicStats or self.LastPeriodicStatsTimestamp is None:
+            return
+        IntervalSeconds = self.PeriodicStatsIntervalMinutes * 60
+        if (time.time() - self.LastPeriodicStatsTimestamp) < IntervalSeconds:
+            return
+        FishThisInterval = self.TotalFishSuccessfullyCaught - self.FishCaughtAtLastPeriodicStats
+        FishPerMin = FishThisInterval / self.PeriodicStatsIntervalMinutes if self.PeriodicStatsIntervalMinutes > 0 else 0
+        AccumulatedTime = self.CumulativeRunningTimeSeconds
+        if self.CurrentSessionBeginTimestamp:
+            AccumulatedTime += time.time() - self.CurrentSessionBeginTimestamp
+        H = int(AccumulatedTime // 3600)
+        M = int((AccumulatedTime % 3600) // 60)
+        S = int(AccumulatedTime % 60)
+        OverallFPH = (self.TotalFishSuccessfullyCaught / AccumulatedTime) * 3600 if AccumulatedTime > 0 else 0
+        self.SendWebhookNotification(
+            f"Stats (last {self.PeriodicStatsIntervalMinutes}m)\n"
+            f"Caught: {FishThisInterval} ({FishPerMin:.1f}/min)\n"
+            f"Total: {self.TotalFishSuccessfullyCaught} | Uptime: {H}:{M:02d}:{S:02d}\n"
+            f"Rate: {OverallFPH:.1f}/hr | Timeouts: {self.TotalRecastTimeouts}"
+        )
+        self.LastPeriodicStatsTimestamp = time.time()
+        self.FishCaughtAtLastPeriodicStats = self.TotalFishSuccessfullyCaught
 
     def SendWebhookNotification(self, message, color=0x00d4ff):
         if not self.WebhookUrl:
@@ -710,7 +775,10 @@ class AutomatedFishingSystem:
                     break
                 
                 if not self.WaitForFishingBobberReady():
+                    self.HandleRecastTimeout()
                     continue
+
+                self.ConsecutiveRecastTimeouts = 0
                 
                 while self.MacroCurrentlyExecuting:
                     if not self.PerformActiveFishingControl():
@@ -720,6 +788,7 @@ class AutomatedFishingSystem:
                     self.TotalFishSuccessfullyCaught += 1
                     self.FishCountSinceLastCraft += 1
                     self.MostRecentFishCaptureTimestamp = time.time()
+                    self.CheckPeriodicStats()
                     
                     RemainingDelayTime = self.DelayAfterFishCaptured
                     while RemainingDelayTime > 0 and self.MacroCurrentlyExecuting:
@@ -729,6 +798,8 @@ class AutomatedFishingSystem:
             
             except Exception as MainLoopError:
                 print(f"Error in Main: {MainLoopError}")
+                if self.WebhookUrl and self.LogGeneralUpdates:
+                    self.SendWebhookNotification(f"Macro crashed: {MainLoopError}")
                 break
     
     def ExecutePreCastSequence(self):
@@ -867,6 +938,9 @@ class AutomatedFishingSystem:
                     if not self.MacroCurrentlyExecuting: return False
                 
                 self.FishCountSinceLastCraft = 0
+
+                if self.WebhookUrl and self.LogGeneralUpdates:
+                    self.SendWebhookNotification("Crafting cycle complete.")
         
         if self.AutomaticBaitPurchaseEnabled and self.ShopLeftButtonLocation and self.ShopCenterButtonLocation and self.ShopRightButtonLocation:
             if self.BaitPurchaseIterationCounter == 0 or self.BaitPurchaseIterationCounter >= self.BaitPurchaseFrequencyCounter:                
@@ -1022,7 +1096,6 @@ class AutomatedFishingSystem:
                         
                         if InitGreenDetected:
                             time.sleep(self.FruitStorageClickConfirmationDelay)
-                            print("checking now.")
                             if not self.DetectGreenishColor(self.FruitStorageButtonLocation) and self.WebhookUrl:
                                 DetectedFruitName = None
                                 if self.TextDetectionEnabled:
@@ -1462,6 +1535,11 @@ class AutomatedFishingSystem:
             "craftButtonClickDelay": self.CraftButtonClickDelay,
             "craftCloseMenuDelay": self.CraftCloseMenuDelay,
             "webhookUrl": self.WebhookUrl,
+            "logRecastTimeouts": self.LogRecastTimeouts,
+            "logPeriodicStats": self.LogPeriodicStats,
+            "logGeneralUpdates": self.LogGeneralUpdates,
+            "periodicStatsInterval": self.PeriodicStatsIntervalMinutes,
+            "totalRecastTimeouts": self.TotalRecastTimeouts,
             "logDevilFruit": self.LogDevilFruitEnabled,
             "baitRecipes": self.BaitRecipes,
             "currentRecipeIndex": self.CurrentRecipeIndex,
@@ -1683,6 +1761,7 @@ class RegionSelectionWindow:
             print(f"Error closing area selector: {ErrorDetails}")
 
 MacroSystemInstance = AutomatedFishingSystem()
+MacroSystemInstance.InitializeOCR()
 
 @FlaskApplication.route('/state', methods=['GET'])
 def RetrieveSystemState():
@@ -1776,6 +1855,10 @@ def ProcessIncomingCommand():
             'set_craft_button_delay': lambda: handle_float_value('CraftButtonClickDelay'),
             'set_craft_close_delay': lambda: handle_float_value('CraftCloseMenuDelay'),
             'set_webhook_url': lambda: handle_string_value('WebhookUrl'),
+            'toggle_log_recast_timeouts': lambda: handle_boolean_toggle('LogRecastTimeouts'),
+            'toggle_log_periodic_stats': lambda: handle_boolean_toggle('LogPeriodicStats'),
+            'toggle_log_general_updates': lambda: handle_boolean_toggle('LogGeneralUpdates'),
+            'set_periodic_stats_interval': lambda: handle_integer_value('PeriodicStatsIntervalMinutes'),
             'toggle_log_devil_fruit': lambda: handle_boolean_toggle('LogDevilFruitEnabled'),
             'open_area_selector': lambda: handle_area_selector(),
             'open_browser': lambda: handle_open_browser(ActionPayload),

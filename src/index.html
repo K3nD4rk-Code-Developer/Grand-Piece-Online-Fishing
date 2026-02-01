@@ -957,13 +957,19 @@
       position: absolute;
       inset: 0;
       opacity: 0;
-      transition: opacity 0.4s ease;
+      visibility: hidden;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
       display: flex;
       align-items: stretch;
+      pointer-events: none;
+      z-index: 0;
     }
 
     .slide.visible {
       opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      z-index: 1;
     }
 
     .slide img {
@@ -980,14 +986,13 @@
       flex-direction: column;
       justify-content: flex-end;
       background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, transparent 55%);
-      opacity: 0;
+      opacity: 1;
       transition: opacity 0.3s ease;
       pointer-events: none;
     }
 
-    .slide:hover .slide-overlay,
-    .slide-overlay.has-text {
-      opacity: 1;
+    .slide:hover .slide-overlay {
+      opacity: 0;
     }
 
     .slide-overlay-inner {
@@ -1109,7 +1114,7 @@
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="version">Version 1.2.6</div>
             <div style="color: #ffd417; opacity: 0.9; font-size: 0.75em;">Development</div>
-            <div style="color: #888; opacity: 0.2; font-size: 0.75em;">3e074e4294ca08ae628b7a6b505f9849</div>
+            <div style="color: #888; opacity: 0.2; font-size: 0.75em;">9089dd099627d95193611a66fb84204f</div>
           </div>
         </div>
       </div>
@@ -1121,7 +1126,7 @@
 
     <div class="main-content">
       <div class="sidebar">
-        <div class="nav-item active" data-view="home">Home</div>
+        <div class="nav-item active" data-view="home">Dashboard</div>
         <div class="nav-item" data-view="controls">Control Center</div>
         <div class="nav-item" data-view="locations">Locations</div>
         <div class="nav-item" data-view="automation">Automation</div>
@@ -1588,15 +1593,40 @@
             <div class="help-hint">Paste your Discord webhook URL to receive notifications</div>
           </div>
           <div class="card">
-            <div class="card-header">Event Logging</div>
-            <div class="checkbox-group">
-              <div class="checkbox-item">
-                <input type="checkbox" id="logDevilFruit"
-                  onchange="sendToPython('toggle_log_devil_fruit', this.checked.toString())">
-                <label class="checkbox-label" for="logDevilFruit">Devil Fruit Stored</label>
+            <div class="card-header">Webhook Notifications</div>
+            <div class="control-group">
+              <span class="control-label">Log Devil Fruit Stored</span>
+              <div class="control-input">
+                <div class="toggle-switch" id="logDevilFruitToggle" onclick="toggleSetting('logDevilFruit')"></div>
               </div>
             </div>
-            <div class="help-hint">Select which events to send to your webhook</div>
+            <div class="control-group">
+              <span class="control-label">Log Recast Timeouts</span>
+              <div class="control-input">
+                <div class="toggle-switch" id="logRecastTimeoutsToggle" onclick="toggleSetting('logRecastTimeouts')"></div>
+              </div>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Log Periodic Stats</span>
+              <div class="control-input">
+                <div class="toggle-switch" id="logPeriodicStatsToggle" onclick="toggleSetting('logPeriodicStats')"></div>
+              </div>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Log General Updates</span>
+              <div class="control-input">
+                <div class="toggle-switch" id="logGeneralUpdatesToggle" onclick="toggleSetting('logGeneralUpdates')"></div>
+              </div>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Stats Report Interval</span>
+              <div class="control-input">
+                <input type="number" class="input" id="periodicStatsInterval" value="5" step="1" min="1"
+                  onchange="sendToPython('set_periodic_stats_interval', this.value)">
+                <span class="unit">minutes</span>
+              </div>
+            </div>
+            <div class="help-hint">Configure which events and how frequently notifications are sent to your webhook</div>
           </div>
         </div>
 
@@ -2121,39 +2151,19 @@
         label: "Auto Store",
         slides: [
           {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
-            title: "Bait Shop Points",
-            desc: "Set the Left, Middle, and Right dialog points at the bait shop NPC."
-          },
-          {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
-            title: "Purchase Frequency",
-            desc: "Adjust loops-per-purchase in the Automation tab to restock on time."
-          },
-          {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
-            title: "",
+            url: "https://i.postimg.cc/cHccJwWf/Item-Store.png",
+            title: "Set up the location for store",
             desc: ""
-          }
+          },
         ]
       },
       {
         label: "Auto Select",
         slides: [
           {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
+            url: "https://i.postimg.cc/wjscmSH2/Select-Top-Bait.png",
             title: "Enable Auto Select",
             desc: "Toggle 'Auto Select Top Bait' in the Automation tab."
-          },
-          {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
-            title: "Bait Point Location",
-            desc: "Set the Top Bait Point in Locations → Bait Locations."
-          },
-          {
-            url: "https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png",
-            title: "",
-            desc: ""
           }
         ]
       }
@@ -2192,7 +2202,7 @@
 
           div.innerHTML = `
           <img src="${slide.url}" alt="${slide.title || 'Guide image'}">
-          <div class="slide-overlay ${hasText ? 'has-text' : ''}">
+          <div class="slide-overlay">
             <div class="slide-overlay-inner">
               ${slide.title ? `<div class="slide-overlay-title">${slide.title}</div>` : ''}
               ${slide.desc ? `<div class="slide-overlay-desc">${slide.desc}</div>` : ''}
@@ -2241,9 +2251,19 @@
     }
 
     function showCurrentSlide() {
-      document.querySelectorAll('.slide').forEach(s => s.classList.remove('visible'));
+      SLIDESHOW_DATA.forEach((cat, ci) => {
+        cat.slides.forEach((slide, si) => {
+          const slideEl = document.getElementById(`slide-${ci}-${si}`);
+          if (slideEl) {
+            slideEl.classList.remove('visible');
+          }
+        });
+      });
+
       const target = document.getElementById(`slide-${activeCategoryIndex}-${activeSlideIndex}`);
-      if (target) target.classList.add('visible');
+      if (target) {
+        target.classList.add('visible');
+      }
     }
 
     document.addEventListener('DOMContentLoaded', buildSlideshow);
@@ -2516,7 +2536,11 @@
       updatePointStatus('addRecipePoint', state.addRecipePoint?.x, state.addRecipePoint?.y);
       updatePointStatus('devilFruitLocationPoint', state.devilFruitLocationPoint?.x, state.devilFruitLocationPoint?.y);
       setInputValue('webhookUrl', state.webhookUrl || '');
-      document.getElementById('logDevilFruit').checked = state.logDevilFruit || false;
+      setToggleState('logDevilFruitToggle', state.logDevilFruit || false);
+      setToggleState('logRecastTimeoutsToggle', state.logRecastTimeouts);
+      setToggleState('logPeriodicStatsToggle', state.logPeriodicStats);
+      setToggleState('logGeneralUpdatesToggle', state.logGeneralUpdates);
+      setInputValue('periodicStatsInterval', state.periodicStatsInterval || 5);
       if (state.baitRecipes !== undefined) RenderRecipes(state.baitRecipes);
       console.log('All settings loaded successfully');
     }
@@ -2552,6 +2576,10 @@
         updatePointStatus('craftButtonPoint', state.craftButtonPoint?.x, state.craftButtonPoint?.y);
         updatePointStatus('addRecipePoint', state.addRecipePoint?.x, state.addRecipePoint?.y);
         updatePointStatus('topRecipePoint', state.topRecipePoint?.x, state.topRecipePoint?.y);
+        setToggleState('logRecastTimeoutsToggle', state.logRecastTimeouts);
+        setToggleState('logPeriodicStatsToggle', state.logPeriodicStats);
+        setToggleState('logGeneralUpdatesToggle', state.logGeneralUpdates);
+        setInputValue('periodicStatsInterval', state.periodicStatsInterval || 5);
       } catch (error) { console.error('Failed to poll state:', error); }
     }
 

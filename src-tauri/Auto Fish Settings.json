@@ -98,14 +98,7 @@
         "RodHotkey": "0",
         "AnythingElseHotkey": "1",
         "DevilFruitHotkeys": [
-            "3",
-            "2",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "9"
+            "2"
         ]
     },
     "AutomationFeatures": {
@@ -123,8 +116,14 @@
     },
     "DevilFruitStorage": {
         "StoreToBackpack": false,
-        "LogDevilFruit": false,
+        "LogDevilFruit": true,
         "WebhookUrl": "https://discord.com/api/webhooks/1355302138020106340/HfF7EF56swzYC_i75qPqWxvyqbIVg8FL03FGsZUkghrxe0azLIpfTURa_Synb8zCCGGQ"
+    },
+    "LoggingOptions": {
+        "LogRecastTimeouts": true,
+        "LogPeriodicStats": true,
+        "LogGeneralUpdates": true,
+        "PeriodicStatsIntervalMinutes": 5
     },
     "FishingControl": {
         "PdController": {
